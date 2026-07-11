@@ -1,60 +1,136 @@
 // netlify/functions/ai-proxy.js
-// Relais sécurisé vers l'API Anthropic : la clé API reste uniquement ici,
-// jamais dans le code envoyé au navigateur.
+// Proxy sécurisé vers Google Gemini
+// La clé API reste uniquement côté serveur (Netlify).
 
 exports.handler = async function (event) {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({
+        error: "Method not allowed",
+      }),
+    };
   }
 
-  //const apiKey = process.env.ANTHROPIC_API_KEY;
-  const apiKey = "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";
+  const apiKey = process.env.GEMINI_API_KEY;
+
   if (!apiKey) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'ANTHROPIC_API_KEY manquante côté serveur (variable d\'environnement Netlify).' }),
+      body: JSON.stringify({
+        error: "GEMINI_API_KEY manquante dans les variables d'environnement Netlify.",
+      }),
     };
   }
 
   let payload;
+
   try {
-    payload = JSON.parse(event.body || '{}');
+    payload = JSON.parse(event.body || "{}");
   } catch (e) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'JSON invalide' }) };
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: "JSON invalide.",
+      }),
+    };
   }
 
-  const { system, messages, max_tokens } = payload;
-  if (!messages) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Le champ "messages" est requis' }) };
+  const { system, messages } = payload;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({
+        error: 'Le champ "messages" est requis.',
+      }),
+    };
   }
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
+    // Construction du prompt
+    let prompt = "";
+
+    if (system) {
+      prompt += system + "\n\n";
+    }
+
+    for (const msg of messages) {
+      if (msg.role === "user") {
+        prompt += `Utilisateur : ${msg.content}\n`;
+      } else if (msg.role === "assistant") {
+        prompt += `Assistant : ${msg.content}\n`;
+      }
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Gemini Error:", data);
+
+      return {
+        statusCode: response.status,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      };
+    }
+
+    const text =
+      data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // On renvoie un format proche d'Anthropic
+    return {
+      statusCode: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-5', // vérifiez sur console.anthropic.com le modèle le plus récent disponible
-        max_tokens: max_tokens || 500,
-        system: system || undefined,
-        messages,
+        id: "gemini-response",
+        model: "gemini-2.5-flash",
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text,
+          },
+        ],
       }),
-    });
-
-    const text = await res.text();
-
-    console.log("Anthropic status:", res.status);
-    console.log("Anthropic response:", text);
-    
-    return {
-      statusCode: res.status,
-      body: text,
     };
   } catch (err) {
     console.error(err);
-    return { statusCode: 502, body: JSON.stringify({ error: 'تعذّر الاتصال بالمساعد الذكي حاليًا.' }) };
+
+    return {
+      statusCode: 500,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        error: err.message,
+      }),
+    };
   }
 };
