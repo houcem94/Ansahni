@@ -253,9 +253,9 @@ async function pickRelevantVideo(automaticThought, emotion){
   const listStr = DR_VIDEOS.map(v=>`id:${v.id} — العنوان: ${v.title} — الكلمات المفتاحية: ${(v.keywords||[]).join('، ')}`).join('\n');
   const userMsg = `فكرة المستخدم: "${automaticThought}"\nشعوره: ${emotion}\n\nقائمة الفيديوهات المتاحة:\n${listStr}`;
   try{
-    const res = await fetch("/.netlify/functions/ai-proxy", {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ max_tokens:30, system:VIDEO_MATCH_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:30, system:VIDEO_MATCH_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
     });
     const data = await res.json();
     const text = (data.content||[]).map(b=>b.text||'').join('').trim();
@@ -954,7 +954,7 @@ function cbtStep0Next(){
   const val = document.getElementById('cbtThought').value.trim(); if(!val) return;
   setCbt({automaticThought:val});
   nextWithReflection(
-    `المستخدم شارك فكرة تلقائية راودته: "${val}" ودرجة اعتقاده بها ${state.cbt.beliefBefore}/100. اكتب تعليقًا داعمًا وقصيرًا (2-3 جمل) يطمئنه على أن هذه الأفكار طبيعية، دون إصدار أي حكم، ويمهّد بلطف للخطوة التالية (تحديد الشعور المرتبط بها).`,
+    `المستخدم شارك فكرة تلقائية راودته: "${val}" ودرجة اعتقاده بها ${state.cbt.beliefBefore}/100. اكتب تعليقًا داعمًا وغنيًا (5-7 جمل) يطمئنه على أن هذه الأفكار طبيعية، دون إصدار أي حكم، ويتعمق قليلًا في سبب شيوع هذا النوع من الأفكار، ويمهّد بلطف للخطوة التالية (تحديد الشعور المرتبط بها).`,
     'شكرًا لمشاركتك. من الطبيعي أن تراودنا أفكار كهذه أحيانًا. الخطوة التالية ستساعدك على فهم الشعور المرتبط بها بشكل أوضح.'
   );
 }
@@ -962,7 +962,7 @@ async function cbtStep1Next(){
   if(!state.cbt.emotion) return;
   setCbt({suggestedTip: findTipForEmotion(state.cbt.emotion), suggestedVideo:null});
   nextWithReflection(
-    `المستخدم حدد شعوره بأنه "${state.cbt.emotion}" بشدة ${state.cbt.emotionIntensity}/100، مرتبطًا بالفكرة: "${state.cbt.automaticThought}". اكتب تعليقًا قصيرًا (2-3 جمل) يتقبّل هذا الشعور دون الحكم عليه، ويوضح بلطف أن الشعور بشيء لا يعني أن الفكرة المرتبطة به صحيحة بالضرورة.`,
+    `المستخدم حدد شعوره بأنه "${state.cbt.emotion}" بشدة ${state.cbt.emotionIntensity}/100، مرتبطًا بالفكرة: "${state.cbt.automaticThought}". اكتب تعليقًا غنيًا (5-7 جمل) يتقبّل هذا الشعور دون الحكم عليه، ويشرح بعمق أن الشعور بشيء لا يعني أن الفكرة المرتبطة به صحيحة بالضرورة، مع مثال أو توضيح بسيط لهذه الفكرة.`,
     `مشاعرك مفهومة ومقبولة. الشعور بـ"${state.cbt.emotion}" لا يعني أن الفكرة صحيحة بالضرورة. لنبحث الآن في الأدلة.`
   );
   const video = await pickRelevantVideo(state.cbt.automaticThought, state.cbt.emotion);
@@ -973,7 +973,7 @@ function cbtStep2Next(){
   const evAgainst = document.getElementById('evAgainst').value.trim();
   setCbt({evidenceFor:evFor, evidenceAgainst:evAgainst});
   nextWithReflection(
-    `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لا شيء محدد'}"، وكأدلة معارضة: "${evAgainst||'لا شيء محدد'}". اكتب تعليقًا قصيرًا (2-4 جمل) يقدّر موضوعيته في النظر للجهتين، ويبرز بلطف ما تكشفه هذه الموازنة.`,
+    `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لا شيء محدد'}"، وكأدلة معارضة: "${evAgainst||'لا شيء محدد'}". اكتب تعليقًا غنيًا (5-7 جمل) يقدّر موضوعيته في النظر للجهتين، ويبرز بالتفصيل ما تكشفه هذه الموازنة عن واقعية الفكرة الأصلية.`,
     'موازنتك بين الأدلة المؤيدة والمعارضة خطوة مهمة نحو رؤية أكثر توازنًا.'
   );
 }
@@ -986,7 +986,7 @@ function toggleThinkingError(e){
 function cbtStep3Next(){
   const errs = state.cbt.thinkingErrors;
   nextWithReflection(
-    `أجاب المستخدم بأن الفكرة "${state.helpsNowText()}" تنفعه الآن، و"${state.harmsNowText()}" تضره، وحدد أخطاء التفكير التالية: ${errs.length? errs.join('، ') : 'لم يحدد أي خطأ تفكير معين'}. اكتب تعليقًا قصيرًا (2-4 جمل) يعزز وعيه بجدوى أو ضرر التمسك بهذه الفكرة، ويشير بلطف إلى فائدة ملاحظة نمط التفكير.`,
+    `أجاب المستخدم بأن الفكرة "${state.helpsNowText()}" تنفعه الآن، و"${state.harmsNowText()}" تضره، وحدد أخطاء التفكير التالية: ${errs.length? errs.join('، ') : 'لم يحدد أي خطأ تفكير معين'}. اكتب تعليقًا غنيًا (5-7 جمل) يعزز وعيه بجدوى أو ضرر التمسك بهذه الفكرة، ويشرح بالتفصيل فائدة ملاحظة نمط التفكير الذي حدده (أو غيابه).`,
     'وعيك بمدى فائدة أو ضرر هذه الفكرة، وبنمط تفكيرك، يمنحك قوة أكبر للتعامل معها.'
   );
 }
@@ -994,20 +994,21 @@ function cbtStep4Next(){
   const val = document.getElementById('newThought').value.trim(); if(!val) return;
   setCbt({newThoughtUser:val});
   nextWithReflection(
-    `أعاد المستخدم صياغة فكرته الأصلية "${state.cbt.automaticThought}" إلى فكرة جديدة: "${val}" بدرجة اعتقاد ${state.cbt.beliefAfter}/100. كما أصبحت درجة اعتقاده بالفكرة القديمة ${state.cbt.beliefOldAfter}/100 بعد أن كانت ${state.cbt.beliefBefore}/100. اكتب تعليقًا قصيرًا (2-4 جمل): امدح الجهد، وإذا رأيت أن الصياغة يمكن أن تكون أكثر واقعية، اقترح بلطف تحسينًا موجزًا، ثم اختم بجملة تشير إلى أنك ستُعِدّ له الآن ملخصًا لهذه الجلسة.`,
+    `أعاد المستخدم صياغة فكرته الأصلية "${state.cbt.automaticThought}" إلى فكرة جديدة: "${val}" بدرجة اعتقاد ${state.cbt.beliefAfter}/100. كما أصبحت درجة اعتقاده بالفكرة القديمة ${state.cbt.beliefOldAfter}/100 بعد أن كانت ${state.cbt.beliefBefore}/100. اكتب تعليقًا غنيًا ومفصّلاً (6-8 جمل): امدح الجهد بالتفصيل، واشرح لماذا هذه الفكرة الجديدة أكثر توازنًا من القديمة، وإذا رأيت أن الصياغة يمكن أن تكون أكثر واقعية، اقترح تحسينًا واضحًا لها، ثم اختم بجملة تشير إلى أنك ستُعِدّ له الآن ملخصًا لهذه الجلسة.`,
     'فكرة جميلة ومتوازنة، وهذا التغيير - مهما كان صغيرًا - نتيجة مجهودك الذهني اليوم. سأعدّ لك الآن ملخصًا لهذه الجلسة.'
   );
 }
 
 /* ---- Appels IA réels (API Anthropic, disponible dans cet aperçu) ---- */
 const STEP_SYSTEM_PROMPT = `أنت مساعد نفسي داعم ضمن تطبيق "انصحني"، يرافق المستخدم في تمرين "تقييم الأفكار التلقائية" (CBT/ACT).
-اكتب حصرًا 2 إلى 4 جمل قصيرة بالعربية الفصحى البسيطة، بأسلوب دافئ ومحترم ومشجّع، دون أي مقدمات أو عناوين.
-لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا ولا تصف أدوية. لا تكرر كلام المستخدم حرفيًا، بل أعد صياغته بإيجاز.`;
+اكتب من 5 إلى 8 جمل غنية ودافئة بالعربية الفصحى البسيطة، بأسلوب متعاطف وعميق ومشجّع، وكأنك مرافق حقيقي يستمع باهتمام حقيقي، دون أي مقدمات أو عناوين.
+فصّل قليلًا فيما تقوله: اعكس ما فهمته من كلام المستخدم بأسلوبك الخاص، ثم أضف ملاحظة أو منظورًا مفيدًا، ثم شجّعه على المتابعة. تجنب الجمل القصيرة المقتضبة والعموميات الجاهزة.
+لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا ولا تصف أدوية. لا تكرر كلام المستخدم حرفيًا، بل أعد صياغته بأسلوبك.`;
 async function aiStepFeedback(promptContext, fallbackText){
   try{
-    const res = await fetch("/.netlify/functions/ai-proxy", {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ max_tokens:220, system:STEP_SYSTEM_PROMPT, messages:[{role:"user", content:promptContext}] })
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:500, system:STEP_SYSTEM_PROMPT, messages:[{role:"user", content:promptContext}] })
     });
     if(!res.ok){ throw new Error('HTTP '+res.status); }
     const data = await res.json();
@@ -1021,8 +1022,9 @@ async function aiStepFeedback(promptContext, fallbackText){
   }
 }
 
-const REPORT_SYSTEM_PROMPT = `أنت مساعد نفسي داعم ضمن تطبيق "انصحني". مهمتك إعداد ملخص ختامي لتمرين "تقييم الأفكار التلقائية" (CBT/ACT).
-قواعد صارمة: لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا. لا تصف أدوية. إذا لاحظت مؤشرات على أفكار إيذاء النفس أو انتحار أو ضيق شديد ومستمر، أو أن درجة الاعتقاد بالفكرة القديمة ما زالت مرتفعة جدًا رغم التمرين، ضع "professional_referral": true مع سبب واضح ومحترم. أسلوبك دافئ، محترم، مشجّع، مختصر. ساعد المستخدم على تقبّل نقاط ضعفه دون إنكارها أو الاستسلام لها.
+const REPORT_SYSTEM_PROMPT = `أنت مساعد نفسي داعم ضمن تطبيق "انصحني". مهمتك إعداد ملخص ختامي غني ومفيد لتمرين "تقييم الأفكار التلقائية" (CBT/ACT).
+اجعل كل حقل من الحقول أدناه من 3 إلى 5 جمل مفصّلة وعميقة، وليس جملة أو جملتين مقتضبتين. اربط كلامك بتفاصيل حقيقية مما شاركه المستخدم بدلًا من عبارات عامة.
+قواعد صارمة: لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا. لا تصف أدوية. إذا لاحظت مؤشرات على أفكار إيذاء النفس أو انتحار أو ضيق شديد ومستمر، أو أن درجة الاعتقاد بالفكرة القديمة ما زالت مرتفعة جدًا رغم التمرين، ضع "professional_referral": true مع سبب واضح ومحترم. أسلوبك دافئ، محترم، مشجّع، وغني بالتفاصيل. ساعد المستخدم على تقبّل نقاط ضعفه دون إنكارها أو الاستسلام لها.
 أجب حصرًا بصيغة JSON التالية دون أي نص إضافي: {"new_thought_ai":"...", "encouragement":"...", "acceptance_note":"...", "summary":"...", "professional_referral":false, "referral_reason":""}`;
 async function runAiReport(){
   setState({aiLoading:true, aiError:'', aiReport:null});
@@ -1039,9 +1041,9 @@ async function runAiReport(){
 درجة الاعتقاد بالجديدة: ${c.beliefAfter}/100
 درجة الاعتقاد بالقديمة بعد التمرين: ${c.beliefOldAfter}/100`;
   try{
-    const res = await fetch("/.netlify/functions/ai-proxy", {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ max_tokens:700, system:REPORT_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1200, system:REPORT_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
     });
     const data = await res.json();
     const raw = (data.content||[]).map(b=>b.text||'').join('');
@@ -1171,14 +1173,14 @@ function computeDayScore(plan, cbtCompleted){
   score += plan.dayRating ? Math.round((plan.dayRating/5)*15) : 0;
   return Math.min(100, score);
 }
-const NOTE_SYSTEM_PROMPT = `أنت مدرّب داعم ضمن تطبيق "انصحني". بناءً على ملخص يوم المستخدم ودرجته من 100، اكتب ملاحظة قصيرة (3-5 جمل) بالعربية:
-تقدّر ما أنجزه، وتذكر بلطف نقطة يمكن تحسينها غدًا، وتنهي بجملة تحفيزية. لا تقدّم تشخيصًا طبيًا أو نفسيًا. لا تستخدم رموزًا مثل JSON، اكتب نصًا عاديًا فقط.`;
+const NOTE_SYSTEM_PROMPT = `أنت مدرّب داعم ضمن تطبيق "انصحني". بناءً على ملخص يوم المستخدم ودرجته من 100، اكتب ملاحظة غنية ومفصّلة (6-9 جمل) بالعربية:
+تحدّث بالتفصيل عمّا أنجزه اليوم وما يعنيه ذلك، واذكر بلطف نقطة يمكن تحسينها غدًا مع اقتراح عملي بسيط، وانهِ بجملة تحفيزية دافئة وشخصية. لا تقدّم تشخيصًا طبيًا أو نفسيًا. لا تستخدم رموزًا مثل JSON، اكتب نصًا عاديًا فقط.`;
 async function generateDailyNote(plan, score){
   const summary = `أنجز المستخدم اليوم: أذكار الصباح: ${plan.morningDone?'نعم':'لا'}. المهام المنجزة: ${plan.tasks.filter(t=>t.done).length}/${plan.tasks.length}. نشاط الظهيرة: ${plan.lunchDone?'نعم':'لا'}. تمرين إعادة صياغة الأفكار: مكتمل. أذكار المساء: ${plan.eveningAdhkarDone?'نعم':'لا'}. تمرين التنفس: مكتمل. تقييمه الذاتي ليومه: ${plan.dayRating||'غير محدد'}/5. النقطة الإجمالية: ${score}/100.`;
   try{
-    const res = await fetch("/.netlify/functions/ai-proxy", {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ max_tokens:260, system:NOTE_SYSTEM_PROMPT, messages:[{role:"user", content:summary}] })
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:500, system:NOTE_SYSTEM_PROMPT, messages:[{role:"user", content:summary}] })
     });
     const data = await res.json();
     const text = (data.content||[]).map(b=>b.text||'').join('').trim();
