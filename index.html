@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>انصحني</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1F2D28; --ink-soft:#63736C;
+    --sage:#2F6E5E; --sage-dark:#204A3F; --sage-light:#E1EEE8;
+    --sand:#F3EFE4; --sand-deep:#E9E2D0;
+    --amber:#D98E3F; --amber-light:#F6E4CB;
+    --dusk:#3B3465; --dusk-light:#E7E4F2;
+    --danger:#C1503F; --danger-light:#F7E7E3;
+    --white:#FFFFFF;
+    --radius-lg:22px; --radius-md:16px; --radius-sm:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    font-family:'Tajawal', sans-serif; color:var(--ink);
+  }
+  #appRoot{
+    min-height:100vh; width:100%; position:relative; overflow-x:hidden;
+    background:
+      radial-gradient(circle at 15% 10%, #EDE7D6 0%, transparent 45%),
+      radial-gradient(circle at 85% 90%, #E3E7DC 0%, transparent 45%),
+      #EAE5D8;
+    transition:background 1s ease;
+  }
+  .app-header{
+    position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between;
+    padding:16px 28px; backdrop-filter:blur(14px); background:rgba(255,255,255,.55);
+    transition:background 1s ease, color .5s ease;
+  }
+  .brand{ display:flex; align-items:center; gap:9px; font-family:'Amiri'; font-size:20px; font-weight:700; color:var(--sage-dark); }
+  .brand-dot{ width:9px; height:9px; border-radius:50%; background:var(--amber); display:inline-block; }
+  .header-actions{ display:flex; gap:10px; }
+  .app-panel{
+    max-width:640px; margin:30px auto 70px; background:rgba(255,255,255,.62); backdrop-filter:blur(20px);
+    border-radius:32px; padding:10px 30px 36px; box-shadow:0 40px 80px -32px rgba(31,45,40,.28);
+    position:relative; z-index:2; transition:background 1s ease, box-shadow 1s ease;
+  }
+  @media (max-width:700px){
+    .app-header{ padding:14px 18px; }
+    .app-panel{ margin:18px 12px 50px; padding:8px 18px 28px; border-radius:24px; }
+  }
+  .screen{ padding:22px 0 10px; animation:fadeIn .4s ease; position:relative; z-index:2; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+  h1,h2,h3{ font-family:'Amiri', serif; margin:0; }
+  .eyebrow{ font-size:12px; color:var(--sage); font-weight:700; letter-spacing:.04em; margin-bottom:4px; }
+  .muted{ color:var(--ink-soft); }
+  .card{ background:var(--white); border-radius:var(--radius-lg); padding:18px; margin-bottom:14px; box-shadow:0 4px 16px rgba(31,45,40,.06); transition:background .5s ease, color .5s ease, border-color .5s ease; }
+  .btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:15px; border:none; border-radius:var(--radius-md);
+    background:var(--sage); color:#fff; font-family:'Tajawal'; font-weight:700; font-size:15px; cursor:pointer; transition:transform .15s ease, background .2s ease, box-shadow .2s ease;
+    box-shadow:0 6px 18px -6px rgba(47,110,94,.55); }
+  .btn:hover{ background:var(--sage-dark); transform:translateY(-2px); }
+  .btn:active{ transform:translateY(0); }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+  .btn.secondary{ background:var(--sage-light); color:var(--sage-dark); box-shadow:none; }
+  .btn.ghost{ background:transparent; color:var(--sage); font-weight:700; padding:10px; box-shadow:none; }
+  .field{ width:100%; border:none; background:var(--white); border-radius:var(--radius-sm); padding:14px 16px; font-family:'Tajawal'; font-size:15px; color:var(--ink); box-shadow:inset 0 0 0 1.5px #E7E1D2; transition:box-shadow .2s ease, background .5s ease, color .5s ease; }
+  .field:focus{ outline:none; box-shadow:inset 0 0 0 1.5px var(--sage); }
+  textarea.field{ resize:none; }
+  .row{ display:flex; gap:10px; }
+  .chip{ padding:9px 14px; border-radius:999px; background:var(--sage-light); color:var(--sage-dark); font-size:13px; font-weight:500; cursor:pointer; border:1.5px solid transparent; user-select:none; transition:.2s; }
+  .chip.selected{ background:var(--sage); color:#fff; }
+  .chip-wrap{ display:flex; flex-wrap:wrap; gap:8px; }
+  .arc-wrap{ position:relative; margin:6px 0 14px; }
+  .arc-caption{ display:flex; justify-content:space-between; font-size:11px; color:var(--ink-soft); margin-top:6px; padding:0 6px;}
+  .moment-card{ display:flex; align-items:center; gap:14px; cursor:pointer; }
+  .moment-card:hover{ transform:translateY(-1px); }
+  .moment-icon{ width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .moment-title{ font-weight:700; font-size:15px; }
+  .moment-sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+  .check{ margin-right:auto; }
+  .progress-track{ display:flex; gap:5px; margin-bottom:22px; }
+  .progress-seg{ flex:1; height:5px; border-radius:4px; background:var(--sand-deep); transition:background .3s; }
+  .progress-seg.active{ background:var(--sage); }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .icon-btn{ width:36px; height:36px; border-radius:50%; background:var(--white); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-soft); box-shadow:0 2px 6px rgba(31,45,40,.06); transition:.4s; }
+  .icon-btn:hover{ color:var(--sage); }
+  .icon-btn.recording{ background:var(--danger); color:#fff; animation:micPulse 1s ease-in-out infinite; }
+  @keyframes micPulse{ 50%{ opacity:.6; } }
+  .bubble{ background:var(--sage-light); border-radius:var(--radius-lg); padding:18px; display:flex; gap:10px; align-items:flex-start; color:var(--sage-dark); line-height:1.7; font-size:14.5px; transition:.5s; }
+  .slider-value{ text-align:center; font-size:13px; color:var(--ink-soft); margin-top:4px; }
+  input[type=range]{ width:100%; accent-color:var(--sage); }
+  .yn-row{ display:flex; gap:10px; }
+  .yn-btn{ flex:1; padding:13px; border-radius:var(--radius-sm); border:1.5px solid #E7E1D2; background:#fff; font-family:'Tajawal'; font-weight:600; cursor:pointer; color:var(--ink); transition:.2s; }
+  .yn-btn.selected{ background:var(--sage-light); border-color:var(--sage); color:var(--sage-dark); }
+  .report-section{ display:flex; gap:10px; margin-bottom:12px; }
+  .report-icon{ width:30px; height:30px; border-radius:50%; background:var(--sage-light); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--sage);}
+  .report-title{ font-weight:700; font-size:13.5px; margin-bottom:4px; }
+  .report-text{ font-size:14px; line-height:1.7; }
+  .referral-box{ background:var(--danger-light); border:1px solid #eccbc3; border-radius:var(--radius-md); padding:14px; display:flex; gap:10px; margin-bottom:14px; color:var(--danger); font-size:13.5px; line-height:1.6; }
+  .breath-circle{ width:170px; height:170px; border-radius:50%; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; margin:0 auto; transition:width .9s ease, height .9s ease; box-shadow:0 0 0 10px rgba(255,255,255,.05); }
+  .breath-num{ font-size:38px; font-weight:700; color:#fff; font-family:'Amiri'; }
+  .star{ font-size:26px; cursor:pointer; color:#DDD6C4; transition:.15s; }
+  .star.active{ color:var(--amber); transform:scale(1.08); }
+  .auth-logo{ width:64px; height:64px; border-radius:20px; background:var(--sage); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; box-shadow:0 10px 24px -8px rgba(47,110,94,.5);}
+  .link-btn{ background:none; border:none; color:var(--sage); font-family:'Tajawal'; font-weight:700; font-size:13.5px; cursor:pointer; }
+  .error-text{ color:var(--danger); font-size:13px; margin-top:2px; }
+  .spinner{ width:30px; height:30px; border-radius:50%; border:3px solid rgba(47,110,94,.15); border-top-color:var(--sage); animation:spin 0.8s linear infinite; margin:0 auto; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .task-item{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--sand-deep); }
+  .task-item:last-child{ border-bottom:none; }
+  .checkbox{ width:21px; height:21px; border-radius:6px; border:2px solid #CFC8B4; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; }
+  .checkbox.done{ background:var(--sage); border-color:var(--sage); color:#fff; }
+  .score-badge{ display:flex; align-items:center; justify-content:center; flex-direction:column; width:74px; height:74px; border-radius:50%;
+    background:conic-gradient(var(--sage) calc(var(--pct,0)*1%), #E9E2D0 0); flex-shrink:0; }
+  .score-badge-inner{ width:58px; height:58px; border-radius:50%; background:var(--white); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; color:var(--sage-dark); }
+
+  /* ---- Ambiances dynamiques (matin / midi / soir) — élément signature ---- */
+  #appRoot[data-theme="neutral"]{ background:
+      radial-gradient(circle at 15% 10%, #EDE7D6 0%, transparent 45%),
+      radial-gradient(circle at 85% 90%, #E3E7DC 0%, transparent 45%), #EAE5D8; }
+  #appRoot[data-theme="morning"]{ background:linear-gradient(165deg, #FDF3E0 0%, #F8E7C4 45%, #F3EFE4 100%); }
+  #appRoot[data-theme="midday"]{ background:linear-gradient(165deg, #EAF4EE 0%, #DCEEE4 45%, #F3EFE4 100%); }
+  #appRoot[data-theme="evening"]{ background:linear-gradient(170deg, #211F3B 0%, #322C57 45%, #453D74 100%); color:#EDEAF6; }
+  #appRoot[data-theme="evening"] .app-header{ background:rgba(255,255,255,.06); }
+  #appRoot[data-theme="evening"] .brand{ color:#F6F3FA; }
+  #appRoot[data-theme="evening"] .app-panel{ background:rgba(255,255,255,.05); box-shadow:0 40px 90px -30px rgba(0,0,0,.5); }
+  #appRoot[data-theme="evening"] .card{ background:rgba(255,255,255,.07); color:#EDEAF6; box-shadow:none; border:1px solid rgba(255,255,255,.09); }
+  #appRoot[data-theme="evening"] .field{ background:rgba(255,255,255,.09); color:#fff; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.16); }
+  #appRoot[data-theme="evening"] .field::placeholder{ color:rgba(237,234,246,.45); }
+  #appRoot[data-theme="evening"] h1,#appRoot[data-theme="evening"] h2,#appRoot[data-theme="evening"] h3{ color:#F6F3FA; }
+  #appRoot[data-theme="evening"] .muted{ color:rgba(237,234,246,.6); }
+  #appRoot[data-theme="evening"] .icon-btn{ background:rgba(255,255,255,.1); color:#EDEAF6; box-shadow:none; }
+  #appRoot[data-theme="evening"] .chip{ background:rgba(255,255,255,.09); color:#EDEAF6; }
+  #appRoot[data-theme="evening"] .chip.selected{ background:var(--amber); color:#2C2A4A; }
+  #appRoot[data-theme="evening"] .bubble{ background:rgba(255,255,255,.1); color:#F6F3FA; }
+  #appRoot[data-theme="evening"] .yn-btn{ background:rgba(255,255,255,.07); color:#EDEAF6; border-color:rgba(255,255,255,.16); }
+  #appRoot[data-theme="evening"] .yn-btn.selected{ background:var(--amber); color:#2C2A4A; border-color:var(--amber); }
+  #appRoot[data-theme="evening"] .task-item{ border-bottom-color:rgba(255,255,255,.12); }
+  #appRoot[data-theme="evening"] .progress-seg{ background:rgba(255,255,255,.14); }
+  #appRoot[data-theme="evening"] .checkbox{ border-color:rgba(255,255,255,.35); }
+  #appRoot[data-theme="evening"] .report-icon{ background:rgba(255,255,255,.12); color:var(--amber-light); }
+
+  .stars-bg{ position:fixed; inset:0; z-index:1; pointer-events:none; opacity:0; transition:opacity 1s ease; }
+  #appRoot[data-theme="evening"] .stars-bg{ opacity:1; }
+  .star-dot{ position:absolute; width:2.5px; height:2.5px; background:#fff; border-radius:50%; animation:twinkle 3.5s ease-in-out infinite; }
+  @keyframes twinkle{ 0%,100%{opacity:.15;} 50%{opacity:.9;} }
+
+  .glow-sun{ position:fixed; top:-60px; right:-40px; width:280px; height:280px; border-radius:50%;
+    background:radial-gradient(circle, rgba(217,142,63,.35), transparent 70%); z-index:1; pointer-events:none; opacity:0; transition:opacity 1s ease; }
+  #appRoot[data-theme="morning"] .glow-sun{ opacity:1; }
+
+  .confetti-wrap{ position:fixed; inset:0; overflow:hidden; z-index:30; pointer-events:none; }
+  .confetti{ position:absolute; top:-10px; width:8px; height:8px; border-radius:2px; animation:fall linear forwards; }
+  @keyframes fall{ to{ transform:translateY(100vh) rotate(300deg); opacity:0; } }
+</style>
+</head>
+<body>
+<div id="appRoot" data-theme="neutral">
+  <div class="stars-bg" id="starsBg"></div>
+  <div class="glow-sun"></div>
+  <div class="confetti-wrap" id="confettiWrap"></div>
+  <header class="app-header" id="appHeader"></header>
+  <div class="app-panel">
+    <div class="screen" id="screen"><div style="text-align:center; padding-top:80px;"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   انصحني — MVP (stockage en cache + appels IA à chaque étape)
+   ============================================================ */
+
+/* ---- Adaptateur de stockage : window.storage si disponible, sinon mémoire ---- */
+const memoryStore = {};
+const store = {
+  async get(key){
+    if(window.storage){
+      try{ const r = await window.storage.get(key, false); return r ? r.value : null; }
+      catch(e){ return null; }
+    }
+    return memoryStore[key] ?? null;
+  },
+  async set(key, value){
+    if(window.storage){
+      try{ await window.storage.set(key, value, false); return; }catch(e){ console.error(e); }
+    }
+    memoryStore[key] = value;
+  }
+};
+async function getJson(key, fallback){ const raw = await store.get(key); if(!raw) return fallback; try{ return JSON.parse(raw); }catch(e){ return fallback; } }
+async function setJson(key, value){ await store.set(key, JSON.stringify(value)); }
+
+const todayStr = () => new Date().toISOString().substring(0,10);
+
+const EMOTIONS = ['الخزي والعار','الذنب','جلد الذات','الاحتقار','الحزن والأسى','الندم','الإشمئزاز','التوتر','الخوف','الغضب','الغيرة','النقص','الرفض','الكراهية','الحقد','الفوبيا','الشفقة'];
+const THINKING_ERRORS = ['التفكير الثنائي (أبيض أو أسود)','التهويل والتضخيم','التعميم المفرط','قراءة الأفكار','التنبؤ السلبي بالمستقبل','معايير "يجب" و"لازم"','التركيز على السلبي فقط','أخذ الأمور بشكل شخصي'];
+const MORNING_ADHKAR = [
+  'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ.',
+  'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ.',
+  'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ ﷺ نَبِيًّا وَرَسُولًا.'
+];
+const EVENING_ADHKAR = [
+  'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ.',
+  'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ.',
+  'اللَّهُمَّ عَالِمَ الْغَيْبِ وَالشَّهَادَةِ، فَاطِرَ السَّمَاوَاتِ وَالْأَرْضِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ.'
+];
+
+/* ---------- بطاقات النصائح العملية (على غرار النموذج المرفق) ---------- */
+const TIPS = [
+  { id:'anger', emotions:['الغضب'], title:'لا تغضب',
+    badTitle:'الاندفاع وتحطيم ما حولك', goodTitle:'تهدئة والسيطرة على النفس',
+    steps:['خذ نفسًا عميقًا من الأنف.','زفر ببطء من الفم.','هدّئ نفسك، ثم اتخذ القرار الصحيح لا قرار اللحظة.'],
+    dhikr:'أعوذ بالله من الشيطان الرجيم', maxim:'القوة الحقيقية هي السيطرة على نفسك، وليس على الأشياء.' },
+  { id:'sadness', emotions:['الحزن والأسى','الندم'], title:'لا تحزن',
+    badTitle:'الانغلاق والاجترار', goodTitle:'التنفيس والاستعانة بالله',
+    steps:['اعترف بمشاعرك دون إنكارها.','تحدث عنها مع شخص تثق به أو اكتبها.','تذكّر أن الفرج قريب بإذن الله.'],
+    dhikr:'حسبنا الله ونعم الوكيل', maxim:'كل ضيق إلى فرج، وكل عسر إلى يسر.' },
+  { id:'fear', emotions:['الخوف','التوتر','الفوبيا'], title:'لا تخف',
+    badTitle:'الهروب والتجنب الدائم', goodTitle:'المواجهة الهادئة خطوة بخطوة',
+    steps:['سمِّ مخاوفك بوضوح لنفسك.','تنفس ببطء لتهدئة جسدك أولًا.','واجه أصغر جزء من الموقف، ثم تدرّج.'],
+    dhikr:'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ', maxim:'الشجاعة ليست غياب الخوف، بل التصرف رغم وجوده.' },
+  { id:'guilt', emotions:['الذنب','جلد الذات'], title:'لا تجلد ذاتك',
+    badTitle:'اللوم القاسي المستمر لنفسك', goodTitle:'التوبة والتصحيح دون قسوة',
+    steps:['اعترف بالخطأ دون تضخيمه.','استغفر وصحّح ما يمكن تصحيحه.','امضِ قدمًا دون أن تسجن نفسك في الماضي.'],
+    dhikr:'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ', maxim:'من أخطأ ثم عاد واستقام، فقد أحسن.' },
+  { id:'jealousy', emotions:['الغيرة','الحقد','الكراهية'], title:'لا تحسد',
+    badTitle:'تمني زوال نعمة الآخرين', goodTitle:'الرضا والدعاء بالبركة',
+    steps:['لاحظ الشعور دون أن تتصرف بناءً عليه.','ادعُ لمن حسدته بالبركة.','ركّز على تنمية ما لديك أنت.'],
+    dhikr:'اللَّهُمَّ بَارِكْ فِيهِ وَلَا حَسَدَ', maxim:'الرضا كنز لا يفنى.' },
+  { id:'shame', emotions:['الخزي والعار','الاحتقار','النقص','الرفض','الإشمئزاز'], title:'لا تحتقر نفسك',
+    badTitle:'الشعور الدائم بالنقص أمام الآخرين', goodTitle:'تقدير الذات بواقعية',
+    steps:['ذكّر نفسك بثلاث نقاط قوة لديك.','افصل بين الخطأ الذي فعلته وبين قيمتك كإنسان.','تعامل مع نفسك كما تعامل صديقًا تحبه.'],
+    dhikr:'اللَّهُمَّ كَمَا حَسَّنْتَ خَلْقِي فَحَسِّنْ خُلُقِي', maxim:'قيمتك ليست في كمالك، بل في محاولتك المستمرة.' }
+];
+function findTipForEmotion(emotion){ return TIPS.find(t=>t.emotions.includes(emotion)) || null; }
+
+/* ---------- فيديوهات د. فتحي سعيد (يُملأ لاحقًا بالروابط الحقيقية) ---------- */
+// كل فيديو: { id: 'معرّف يوتيوب', title: 'العنوان بالعربية', emotions:[...], keywords:[...] }
+const DR_VIDEOS = [
+  { id:'hAkY8HeKe48', title:'ضعف الثقة بالنفس', emotions:['النقص','الاحتقار'], keywords:['ثقة بالنفس','ضعف الثقة','تقدير الذات'] },
+  { id:'iBSWh3Q0ODE', title:'التعامل مع الفشل', emotions:['الندم','النقص'], keywords:['الفشل','خيبة أمل','الإحباط'] },
+  { id:'fo_WjF8mCdM', title:'Overthinking - التفكير الزائد', emotions:['التوتر','الخوف'], keywords:['التفكير الزائد','القلق','الأفكار المتكررة','overthinking'] },
+  { id:'szJmoRsAtwQ', title:'التعامل مع العصبية', emotions:['الغضب'], keywords:['العصبية','الانفعال','ضبط النفس'] },
+];
+function findVideoForEmotion(emotion){ return DR_VIDEOS.find(v=>v.emotions.includes(emotion)) || null; }
+
+const VIDEO_MATCH_SYSTEM_PROMPT = `أنت مساعد يختار أنسب فيديو إرشادي للمستخدم من قائمة فيديوهات الدكتور فتحي سعيد، أخصائي نفسي.
+أجب حصرًا بمعرّف الفيديو (id) الأنسب من القائمة المعطاة، دون أي نص إضافي. إذا لم يكن أي فيديو مناسبًا فعليًا لحالة المستخدم، أجب فقط بكلمة: none`;
+async function pickRelevantVideo(automaticThought, emotion){
+  if(DR_VIDEOS.length===0) return null;
+  // مطابقة سريعة بالوسم أولًا كخط أساس
+  const tagMatch = findVideoForEmotion(emotion);
+  if(DR_VIDEOS.length===1) return tagMatch;
+  // إن وُجد أكثر من فيديو محتمل، نطلب من الذكاء الاصطناعي اختيار الأنسب دلاليًا
+  const listStr = DR_VIDEOS.map(v=>`id:${v.id} — العنوان: ${v.title} — الكلمات المفتاحية: ${(v.keywords||[]).join('، ')}`).join('\n');
+  const userMsg = `فكرة المستخدم: "${automaticThought}"\nشعوره: ${emotion}\n\nقائمة الفيديوهات المتاحة:\n${listStr}`;
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:30, system:VIDEO_MATCH_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
+    });
+    const data = await res.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
+    if(text.toLowerCase().includes('none')) return null;
+    return DR_VIDEOS.find(v=>text.includes(v.id)) || tagMatch;
+  }catch(e){ console.error(e); return tagMatch; }
+}
+function openVideo(id, from){ state.activeVideoId = id; state.videoReturnScreen = from; go('video_detail'); }
+function pickTipOfDay(){ return TIPS[new Date().getDate() % TIPS.length]; }
+function openTip(id, from){ state.activeTipId = id; state.tipReturnScreen = from; go('tip_detail'); }
+function computeStreak(history){
+  const set = new Set(history.map(h=>h.date));
+  let streak=0; let d = new Date();
+  for(let i=0;i<365;i++){
+    const iso = d.toISOString().substring(0,10);
+    if(set.has(iso)){ streak++; d.setDate(d.getDate()-1); }
+    else { if(i===0){ d.setDate(d.getDate()-1); continue; } break; }
+  }
+  return streak;
+}
+
+/* ---------- Onboarding (premier login) ---------- */
+const ONBOARDING_SLIDES = [
+  { title:'صباحك يبدأ بسكينة', text:'صباحك يبدأ بسكينة معي. سأذكّرك بأذكار الصباح، ثم نحضّر معًا مخططًا بسيطًا لمهامك.' },
+  { title:'استراحة منتصف اليوم', text:'في استراحة الظهيرة، سأقترح عليك نشاطًا قصيرًا: تنفس، امتنان، مشي واعٍ، أو تحدٍّ إيجابي.' },
+  { title:'مساؤك لإعادة صياغة أفكارك', text:'في المساء، سأرافقك خطوة بخطوة لتحويل أفكارك المزعجة إلى أفكار أكثر توازنًا، ثم أذكار المساء وتمرين تنفس قبل النوم.' },
+  { title:'تابع تطورك يومًا بعد يوم', text:'كل يوم تكمله يمنحك نقطة من 100 وسلسلة أيام متتالية، ومكتبة نصائح عملية تناسب شعورك في كل لحظة. أراك قريبًا!' }
+];
+
+let state = {
+  screen:'login', authError:'', email:'',
+  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false },
+  cbt:{ step:0, showReflection:false, reflectionText:'', reflectionLoading:false,
+    automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50, evidenceFor:'', evidenceAgainst:'',
+    helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 },
+  aiReport:null, aiLoading:false, aiError:'',
+  scoreHistory:[]
+};
+
+function setState(patch){ state = {...state, ...patch}; render(); }
+function setCbt(patch){ state.cbt = {...state.cbt, ...patch}; render(); }
+function go(screen){ setState({screen}); }
+
+/* ---------- ICONS ---------- */
+const ic = {
+  sun:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.8"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></g></svg>`,
+  moon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+  spa:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21c-4-2-7-6-7-10a7 7 0 0 1 14 0c0 4-3 8-7 10Z" stroke="currentColor" stroke-width="1.7"/><path d="M12 21V9" stroke="currentColor" stroke-width="1.7"/></svg>`,
+  check:`<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="currentColor" opacity=".15"/><path d="M7 12.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  arrow:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  back:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M10 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  logout:`<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 17l5-5-5-5M20 12H9M12 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  leaf:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20c8 0 16-8 16-16-8 0-16 8-16 16Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>`,
+  heart:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.4-9.3-8.9C1.2 8 2.7 5 6 5c2 0 3.4 1.1 4 2.4C10.6 6.1 12 5 14 5c3.3 0 4.8 3 3.3 6.1C15 15.6 12 20 12 20Z" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  book:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5c-.8 0-1.5-.7-1.5-1.5v-13ZM20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5c.8 0 1.5-.7 1.5-1.5v-13Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`,
+  trophy:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z" stroke="currentColor" stroke-width="1.6"/><path d="M9 15h6v3H9zM8 20h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5" stroke="currentColor" stroke-width="1.6"/></svg>`,
+  spark:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+  alert:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`,
+  chart:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h16M8 15l3-3 3 2 4-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  home:`<svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 11.5 12 4l8 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  face:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="10.5" r="1.3" fill="currentColor"/><circle cx="15" cy="10.5" r="1.3" fill="currentColor"/><path d="M8 14.8c1.2 1.3 2.6 2 4 2s2.8-.7 4-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+  speaker:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  speakerOff:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M21 8l-5 5m0-5 5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  mic:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`
+};
+const COMPANION_NAME = 'أنيس';
+let speakRegistry = {}; let speakCounter = 0;
+function registerSpeak(text){ const id='sp'+(speakCounter++); speakRegistry[id]=text; return id; }
+function speakText(text){
+  try{
+    if(!('speechSynthesis' in window)){
+      alert('قراءة النصوص بصوت عالٍ غير مدعومة في هذه البيئة (قد تعمل بشكل طبيعي بعد نشر التطبيق على موقع حقيقي).');
+      return;
+    }
+    if(!text) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ar-SA'; u.rate = 0.95; u.pitch = 1;
+    u.onerror = (e)=>{ console.error('speechSynthesis error:', e); };
+    window.speechSynthesis.speak(u);
+  }catch(e){ console.error(e); alert('تعذّرت القراءة الصوتية في هذه البيئة.'); }
+}
+function speakById(id){ if(speakRegistry[id]) speakText(speakRegistry[id]); }
+function toggleAutoSpeak(){
+  state.autoSpeak = !state.autoSpeak;
+  if(state.email) setJson(`ansahni:autospeak:${state.email}`, state.autoSpeak);
+  if(!state.autoSpeak && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  render();
+}
+/* ---- تسجيل صوتي (يُستخدم فقط في حقول تمرين إعادة صياغة الأفكار) ---- */
+let activeRecognition = null;
+function startVoiceInput(targetId, btnId){
+  const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById(btnId);
+  if(!SRClass){ alert('التعرف الصوتي غير مدعوم في هذا المتصفح حاليًا. جرّب متصفح Chrome على الحاسوب أو أندرويد.'); return; }
+  if(activeRecognition){ activeRecognition.stop(); activeRecognition=null; if(btn) btn.classList.remove('recording'); return; }
+  const target = document.getElementById(targetId);
+  if(!target) return;
+  const rec = new SRClass();
+  rec.lang = 'ar-SA'; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onresult = (e)=>{ const text = e.results[0][0].transcript; target.value = (target.value.trim()? target.value.trim()+' ' : '') + text; };
+  rec.onend = ()=>{ if(btn) btn.classList.remove('recording'); activeRecognition=null; };
+  rec.onerror = (e)=>{
+    if(btn) btn.classList.remove('recording');
+    activeRecognition=null;
+    let msg = 'تعذّر تشغيل التسجيل الصوتي.';
+    if(e.error==='not-allowed' || e.error==='service-not-allowed') msg = 'تم رفض الوصول إلى الميكروفون. هذا متوقع داخل هذه المعاينة المدمجة — جرّب فتح الملف مباشرة في تبويب متصفح كامل (وليس داخل إطار مضمّن)، وامنح إذن الميكروفون عند الطلب.';
+    else if(e.error==='no-speech') msg = 'لم يتم رصد أي كلام، حاول مجددًا.';
+    alert(msg);
+    console.error('SpeechRecognition error:', e.error);
+  };
+  activeRecognition = rec;
+  if(btn) btn.classList.add('recording');
+  try{
+    rec.start();
+  }catch(e){
+    console.error(e);
+    if(btn) btn.classList.remove('recording');
+    alert('تعذّر بدء التسجيل الصوتي في هذه البيئة.');
+  }
+}
+function micButton(targetId){
+  const btnId = 'mic-'+targetId;
+  return `<div style="display:flex; justify-content:flex-end; margin-top:6px;">
+    <button id="${btnId}" class="icon-btn" title="تسجيل صوتي" onclick="startVoiceInput('${targetId}','${btnId}')">${ic.mic}</button>
+  </div>`;
+}
+const COMPANION_AVATAR_SRC = 'data:image/jpeg;base64,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';
+function companionAvatar(size){
+  size = size || 32;
+  return `<img src="${COMPANION_AVATAR_SRC}" alt="${COMPANION_NAME}" style="width:${size}px; height:${size}px; min-width:${size}px;
+    border-radius:50%; object-fit:cover; box-shadow:0 5px 14px -4px rgba(47,110,94,.55); border:2px solid #fff; flex-shrink:0;" />`;
+}
+function companionSpeech(text, size){
+  size = size || 34;
+  const id = registerSpeak(text);
+  return `<div class="bubble">
+    ${companionAvatar(size)}
+    <div style="flex:1;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px;">
+        <div style="font-weight:700; font-size:12px; opacity:.8;">${COMPANION_NAME}</div>
+        <button class="icon-btn" style="width:24px; height:24px; flex-shrink:0;" title="استمع" onclick="speakById('${id}')">${ic.speaker}</button>
+      </div>
+      <div>&quot;${text}&quot;</div>
+    </div>
+  </div>`;
+}
+
+function renderHeader(){
+  const loggedIn = !['login','onboarding'].includes(state.screen);
+  return `<div class="brand"><span class="brand-dot"></span>انصحني</div>
+  ${loggedIn ? `<div class="header-actions">
+    <button class="icon-btn" title="${state.autoSpeak?'إيقاف نطق ردود '+COMPANION_NAME:'تفعيل نطق ردود '+COMPANION_NAME}"
+      style="${state.autoSpeak?'background:var(--sage); color:#fff;':''}" onclick="toggleAutoSpeak()">${state.autoSpeak?ic.speaker:ic.speakerOff}</button>
+    <button class="icon-btn" title="الرئيسية" onclick="go('home')">${ic.home}</button>
+    <button class="icon-btn" title="تسجيل الخروج" onclick="doLogout()">${ic.logout}</button>
+  </div>` : '<span></span>'}`;
+}
+
+/* ---------- THÈME PAR AMBIANCE (matin / midi / soir) ---------- */
+function themeForScreen(s){
+  if(['morning_adhkar','morning_planning'].includes(s)) return 'morning';
+  if(['lunch_choice','lunch_activity'].includes(s)) return 'midday';
+  if(['evening_intro','cbt','cbt_report','evening_adhkar','day_eval','breathing'].includes(s)) return 'evening';
+  return 'neutral';
+}
+function ensureStars(){
+  const wrap = document.getElementById('starsBg');
+  if(wrap.childElementCount) return;
+  for(let i=0;i<18;i++){
+    const d = document.createElement('div');
+    d.className='star-dot';
+    d.style.left = Math.random()*100+'%';
+    d.style.top = Math.random()*70+'%';
+    d.style.animationDelay = (Math.random()*3.5)+'s';
+    wrap.appendChild(d);
+  }
+}
+
+/* ---------- CARTE "MAINTENANT" (remplace l'arc, sensible à l'heure réelle) ---------- */
+function currentTimeSlot(){
+  const h = new Date().getHours();
+  if(h>=4 && h<12) return 'morning';
+  if(h>=12 && h<17) return 'midday';
+  return 'evening';
+}
+const SLOT_META = {
+  morning:{ emoji:'☀️', label:'الصباح', title:'حان وقت بداية يومك', text:'أذكار الصباح، ثم تحضير مخطط بسيط لمهامك.', action:"go('morning_adhkar')", cta:'ابدأ صباحك', bg:'linear-gradient(135deg,#FDF3E0,#F8E7C4)', color:'var(--amber)' },
+  midday:{ emoji:'🌿', label:'الظهيرة', title:'حان وقت استراحة قصيرة', text:'نشاط بسيط لخمس دقائق يعيد لك توازنك.', action:"go('lunch_choice')", cta:'خذ استراحتك', bg:'linear-gradient(135deg,#EAF4EE,#DCEEE4)', color:'var(--sage)' },
+  evening:{ emoji:'🌙', label:'المساء', title:'حان وقت مراجعة يومك', text:'إعادة صياغة الأفكار، أذكار المساء، وتنفس قبل النوم.', action:"go('evening_intro')", cta:'ابدأ مساءك', bg:'linear-gradient(135deg,#E7E4F2,#F3EFE4)', color:'var(--dusk)' }
+};
+function heroCard(){
+  const slot = currentTimeSlot();
+  const p = state.plan;
+  const doneMap = { morning:p.morningDone, midday:p.lunchDone, evening:(p.eveningAdhkarDone && p.breathingDone) };
+  let activeSlot = slot;
+  if(doneMap[slot]){
+    const order = ['morning','midday','evening'];
+    const next = order.find(s=>!doneMap[s]);
+    if(next) activeSlot = next;
+  }
+  const m = SLOT_META[activeSlot];
+  const isDone = doneMap[activeSlot];
+  return `
+  <div class="card" style="background:${m.bg}; border:none; padding:22px;">
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div style="font-size:34px;">${m.emoji}</div>
+      <div style="flex:1;">
+        <div class="eyebrow" style="color:${m.color};">${m.label}</div>
+        <div style="font-weight:800; font-size:16.5px;">${isDone? 'أحسنت! أكملت هذه المرحلة 🎉' : m.title}</div>
+      </div>
+    </div>
+    <p style="font-size:13.5px; margin:12px 0 14px; color:var(--ink-soft);">${isDone? 'يمكنك تصفح مكتبة النصائح أو انتظار الموعد التالي.' : m.text}</p>
+    ${!isDone ? `<button class="btn" onclick="${m.action}">${m.cta}</button>` : ''}
+  </div>
+  <div style="display:flex; gap:8px; margin:12px 0 18px;">
+    ${['morning','midday','evening'].map(s=>`
+    <div style="flex:1; display:flex; align-items:center; gap:6px; background:var(--white); border-radius:12px; padding:8px 10px; opacity:${s===activeSlot?1:.6};">
+      <span style="font-size:15px;">${SLOT_META[s].emoji}</span>
+      <span style="font-size:11px; font-weight:700; flex:1;">${SLOT_META[s].label}</span>
+      <span style="color:${doneMap[s]?'var(--sage)':'#CFC8B4'};">${doneMap[s]?ic.check:'○'}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+/* ---------- COURBE D'ÉVOLUTION DES NOTES ---------- */
+function formatShortDate(iso){ const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString('ar-EG',{day:'numeric', month:'short'}); }
+function scoreChart(){
+  const history = [...state.scoreHistory].sort((a,b)=> a.date.localeCompare(b.date));
+  if(history.length===0){
+    return `<div class="card" style="text-align:center; padding:26px 10px;">
+      <div style="color:var(--sage); margin-bottom:6px;">${ic.chart}</div>
+      <p class="muted" style="font-size:13px;">أكمل يومك الأول ليبدأ رسم رحلتك هنا 📈</p>
+    </div>`;
+  }
+  const last = history.slice(-14);
+  const w=300,h=110,pad=16, maxS=100;
+  const stepX = last.length>1 ? (w-2*pad)/(last.length-1) : 0;
+  const pts = last.map((d,i)=>[pad+i*stepX, h-pad-(d.score/maxS)*(h-2*pad)]);
+  const pathD = pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const areaD = pts.length>1 ? `${pathD} L ${pts[pts.length-1][0].toFixed(1)} ${h-pad} L ${pts[0][0].toFixed(1)} ${h-pad} Z` : '';
+  const lastScore = last[last.length-1].score;
+  return `
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-weight:700; font-size:14px;">رحلتك خلال الأيام الماضية</span>
+      <span style="font-weight:800; color:var(--sage); font-size:15px;">${lastScore}/100</span>
+    </div>
+    <svg width="100%" viewBox="0 0 ${w} ${h}" height="${h}">
+      <defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2F6E5E" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#2F6E5E" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${areaD?`<path d="${areaD}" fill="url(#scoreGrad)" stroke="none"/>`:''}
+      <path d="${pathD}" fill="none" stroke="#2F6E5E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.4" fill="#fff" stroke="#2F6E5E" stroke-width="2"/>`).join('')}
+    </svg>
+    <div style="display:flex; justify-content:space-between; font-size:10.5px; color:var(--ink-soft); margin-top:2px;">
+      <span>${formatShortDate(last[0].date)}</span><span>${formatShortDate(last[last.length-1].date)}</span>
+    </div>
+  </div>`;
+}
+
+function screenVideoLibrary(){
+  return `
+  ${topbar('نصائح د. فتحي بالفيديو', "go('home')")}
+  <p class="muted" style="margin-bottom:14px; font-size:14px;">فيديوهات قصيرة من الدكتور فتحي سعيد، أخصائي نفسي</p>
+  ${DR_VIDEOS.length===0 ? `<div class="card" style="text-align:center; padding:26px 10px;">
+    <div style="font-size:26px; margin-bottom:8px;">🎬</div>
+    <p class="muted" style="font-size:13.5px;">سيتم إضافة فيديوهات الدكتور فتحي قريبًا هنا.</p>
+  </div>` :
+  DR_VIDEOS.map(v=>`
+  <div class="moment-card card" onclick="openVideo('${v.id}','library')">
+    <div class="moment-icon" style="background:var(--dusk-light); color:var(--dusk);">▶️</div>
+    <div><div class="moment-title">${v.title}</div><div class="moment-sub">${(v.emotions||[]).join('، ')}</div></div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>`).join('')}`;
+}
+function screenVideoDetail(){
+  const v = DR_VIDEOS.find(x=>x.id===state.activeVideoId);
+  const back = `go('${state.videoReturnScreen||'home'}')`;
+  if(!v) return `${topbar('فيديو', "go('home')")}<p class="muted">تعذّر إيجاد هذا الفيديو.</p>`;
+  return `
+  ${topbar(v.title, back)}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div style="position:relative; padding-top:56.25%;">
+      <iframe src="https://www.youtube.com/embed/${v.id}" title="${v.title}"
+        style="position:absolute; inset:0; width:100%; height:100%; border:none;"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </div>
+  <p class="muted" style="font-size:12px; text-align:center; margin-top:6px;">قد لا يعمل التشغيل داخل هذه المعاينة المدمجة — سيعمل بشكل طبيعي بعد نشر التطبيق.</p>
+  <button class="btn" style="margin-top:14px;" onclick="${back}">رجوع</button>`;
+}
+function screenLibrary(){
+  return `
+  ${topbar('مكتبة النصائح', "go('home')")}
+  <p class="muted" style="margin-bottom:14px; font-size:14px;">بطاقات عملية قصيرة تساعدك في اللحظات الصعبة، مستوحاة من التوازن بين الجانب النفسي والروحي</p>
+  ${TIPS.map(t=>`
+  <div class="moment-card card" onclick="openTip('${t.id}','library')">
+    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${ic.spark}</div>
+    <div><div class="moment-title">${t.title}</div><div class="moment-sub">${t.emotions.join('، ')}</div></div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>`).join('')}`;
+}
+function screenTipDetail(){
+  const t = TIPS.find(x=>x.id===state.activeTipId);
+  const back = `go('${state.tipReturnScreen||'home'}')`;
+  if(!t) return `${topbar('نصيحة', "go('home')")}<p class="muted">تعذّر إيجاد هذه النصيحة.</p>`;
+  return `
+  ${topbar(t.title, back)}
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+    <div class="card" style="flex:1; min-width:130px; background:linear-gradient(160deg,#F7E3DE,#F3EFE4); border:1px solid #E9C9BE; margin-bottom:0;">
+      <div style="text-align:center; font-size:28px; margin-bottom:8px;">❌</div>
+      <div style="font-weight:700; font-size:13px; text-align:center; color:var(--danger); line-height:1.5;">${t.badTitle}</div>
+    </div>
+    <div class="card" style="flex:1; min-width:130px; background:linear-gradient(160deg,#E1F0E6,#F3EFE4); border:1px solid #BFE0CB; margin-bottom:0;">
+      <div style="text-align:center; font-size:28px; margin-bottom:8px;">✅</div>
+      <div style="font-weight:700; font-size:13px; text-align:center; color:var(--sage-dark); line-height:1.5;">${t.goodTitle}</div>
+    </div>
+  </div>
+  <div class="card">
+    ${t.steps.map((s,i)=>`<div style="display:flex; gap:10px; align-items:flex-start; ${i<t.steps.length-1?'margin-bottom:12px;':''}">
+      <div style="width:26px; height:26px; border-radius:50%; background:var(--sage-light); color:var(--sage-dark); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;">${i+1}</div>
+      <div style="padding-top:3px; font-size:14.5px; line-height:1.6;">${s}</div>
+    </div>`).join('')}
+  </div>
+  <div class="bubble" style="margin-bottom:14px;">
+    <span style="flex-shrink:0;">${ic.spark}</span>
+    <span style="font-family:'Amiri'; font-size:17px;">${t.dhikr}</span>
+  </div>
+  <div class="card" style="text-align:center; font-size:13.5px; font-weight:700;">${t.maxim}</div>
+  <button class="btn" style="margin-top:16px;" onclick="${back}">فهمت، أرجع</button>`;
+}
+
+function screenOnboarding(){
+  const i = state.onboardingIndex||0;
+  const s = ONBOARDING_SLIDES[i];
+  const isLast = i===ONBOARDING_SLIDES.length-1;
+  return `
+  <div style="text-align:center; padding:40px 10px 10px;">
+    <div style="display:flex; justify-content:center; margin-bottom:18px;">${companionAvatar(96)}</div>
+    <div style="font-weight:700; font-size:13px; color:var(--sage); margin-bottom:10px;">${COMPANION_NAME}</div>
+    <h2 style="font-size:19px; margin-bottom:12px;">${s.title}</h2>
+    <p class="muted" style="font-size:14.5px; line-height:1.9; max-width:380px; margin:0 auto;">"${s.text}"</p>
+  </div>
+  <div style="display:flex; justify-content:center; gap:6px; margin:28px 0;">
+    ${ONBOARDING_SLIDES.map((_,idx)=>`<div style="width:${idx===i?'22px':'8px'}; height:8px; border-radius:4px; background:${idx===i?'var(--sage)':'var(--sand-deep)'}; transition:.3s;"></div>`).join('')}
+  </div>
+  <button class="btn" onclick="onboardingNext()">${isLast? 'ابدأ رحلتك':'التالي'}</button>
+  ${!isLast?`<button class="btn ghost" style="margin-top:6px;" onclick="finishOnboarding()">تخطي</button>`:''}`;
+}
+function onboardingNext(){
+  if((state.onboardingIndex||0) < ONBOARDING_SLIDES.length-1){ setState({onboardingIndex:(state.onboardingIndex||0)+1}); }
+  else { finishOnboarding(); }
+}
+async function finishOnboarding(){
+  await setJson(`ansahni:onboarded:${state.email}`, true);
+  setState({screen:'home', onboardingIndex:0});
+}
+
+function topbar(title, onBack, onLogout){
+  return `<div class="topbar">
+    ${onBack?`<button class="icon-btn" onclick="${onBack}">${ic.back}</button>`:'<span style="width:36px"></span>'}
+    <h2 style="font-size:18px;">${title}</h2>
+    ${onLogout?`<button class="icon-btn" onclick="${onLogout}">${ic.logout}</button>`:'<span style="width:36px"></span>'}
+  </div>`;
+}
+
+/* ============================================================
+   ÉCRANS
+   ============================================================ */
+function screenLogin(){
+  return `
+  <div style="text-align:center; padding:34px 0 6px;">
+    <div class="auth-logo" style="color:#fff; margin:0 auto 14px;">${ic.spa}</div>
+    <h1 style="font-size:34px; color:var(--sage-dark);">انصحني</h1>
+    <p class="muted" style="margin-top:8px; font-size:14px;">مرافقك اليومي للتحسّن التدريجي</p>
+  </div>
+  <div class="card" style="max-width:420px; margin:22px auto 0; display:flex; flex-direction:column; gap:12px;">
+    <input class="field" id="fullname" placeholder="اسمك (اختياري)" />
+    <input class="field" id="email" placeholder="البريد الإلكتروني" />
+    ${state.authError? `<div class="error-text">${state.authError}</div>`:''}
+    <button class="btn" onclick="doEnter()">دخول</button>
+    <p class="muted" style="text-align:center; font-size:12px; margin-top:2px;">لا حاجة لكلمة مرور في هذه النسخة — فقط أدخل بريدك للمتابعة.</p>
+  </div>`;
+}
+function screenHome(){
+  const p = state.plan;
+  const today = state.scoreHistory.find(h=>h.date===todayStr());
+  const streak = computeStreak(state.scoreHistory);
+  return `
+  <div class="topbar">
+    <span></span>
+    <div>
+      <div class="eyebrow">${new Date().toLocaleDateString('ar-EG',{weekday:'long', day:'numeric', month:'long'})}</div>
+      <h2 style="font-size:19px;">مرحبًا${state.userName? ' يا '+state.userName:''} 👋</h2>
+    </div>
+    <span style="width:36px;"></span>
+  </div>
+  ${streak>0 ? `<div class="card" style="display:flex; align-items:center; gap:12px;">
+    <div style="font-size:26px;">🔥</div>
+    <div><div style="font-weight:800; font-size:16.5px;">${streak} ${streak===1?'يوم متتالٍ':'أيام متتالية'}</div><div class="muted" style="font-size:12px; margin-top:2px;">حافظ على استمراريتك، يومًا بعد يوم</div></div>
+  </div>` : ''}
+  ${heroCard()}
+  ${today ? `<div class="card" style="display:flex; align-items:center; gap:14px;">
+    <div class="score-badge" style="--pct:${today.score};"><div class="score-badge-inner">${today.score}</div></div>
+    <div><div style="font-weight:700; font-size:14.5px;">نقطتك اليوم</div><div class="muted" style="font-size:12.5px; margin-top:3px;">${today.note ? today.note.slice(0,60)+'…' : 'أحسنت على مجهودك اليوم'}</div></div>
+  </div>` : ''}
+  ${rewardsCard()}
+  ${scoreChart()}
+
+  <div style="font-weight:800; font-size:14.5px; margin:22px 0 10px;">برنامجك اليومي</div>
+  <div class="moment-card card" onclick="go('morning_adhkar')">
+    <div class="moment-icon" style="background:var(--amber-light); color:var(--amber);">${ic.sun}</div>
+    <div><div class="moment-title">بداية اليوم</div><div class="moment-sub">أذكار الصباح وتحضير المخطط</div></div>
+    <div class="check" style="color:${p.morningDone?'var(--sage)':'#CFC8B4'};">${p.morningDone?ic.check:ic.arrow}</div>
+  </div>
+  <div class="moment-card card" onclick="go('lunch_choice')">
+    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${ic.spa}</div>
+    <div><div class="moment-title">استراحة الظهيرة</div><div class="moment-sub">نشاط قصير: تنفس، امتنان، مشي...</div></div>
+    <div class="check" style="color:${p.lunchDone?'var(--sage)':'#CFC8B4'};">${p.lunchDone?ic.check:ic.arrow}</div>
+  </div>
+  <div class="moment-card card" onclick="go('evening_intro')">
+    <div class="moment-icon" style="background:var(--dusk-light); color:var(--dusk);">${ic.moon}</div>
+    <div><div class="moment-title">نهاية اليوم</div><div class="moment-sub">إعادة صياغة الأفكار، أذكار وتنفس</div></div>
+    <div class="check" style="color:${(p.eveningAdhkarDone&&p.breathingDone)?'var(--sage)':'#CFC8B4'};">${(p.eveningAdhkarDone&&p.breathingDone)?ic.check:ic.arrow}</div>
+  </div>
+
+  <div style="font-weight:800; font-size:14.5px; margin:22px 0 10px;">أنشطة أخرى</div>
+  ${tipOfDayCard()}
+  <div class="moment-card card" onclick="go('library')">
+    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${ic.book}</div>
+    <div><div class="moment-title">مكتبة النصائح</div><div class="moment-sub">بطاقات عملية لكل شعور تمر به</div></div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>
+  <div class="moment-card card" onclick="go('video_library')">
+    <div class="moment-icon" style="background:var(--dusk-light); color:var(--dusk);">▶️</div>
+    <div><div class="moment-title">نصائح د. فتحي بالفيديو</div><div class="moment-sub">${DR_VIDEOS.length? 'فيديوهات قصيرة تناسب حالتك':'قريبًا'}</div></div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>`;
+}
+function tipOfDayCard(){
+  const t = pickTipOfDay();
+  return `<div class="moment-card card" onclick="openTip('${t.id}','home')">
+    <div class="moment-icon" style="background:var(--amber-light); color:var(--amber);">${ic.spark}</div>
+    <div><div class="moment-title">نصيحة اليوم: ${t.title}</div><div class="moment-sub">اضغط للاطلاع على خطوات عملية</div></div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>`;
+}
+
+/* ---------- نقاط المكافأة (5 نقاط لكل يوم مكتمل، حتى 200 = استشارة مجانية) ---------- */
+const REWARD_TARGET = 200;
+const REWARD_DOCTOR = 'د. فتحي سعيد';
+function rewardsCard(){
+  const pts = state.points||0;
+  if(state.rewardClaimed){
+    return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6;">
+      <div style="font-size:26px; margin-bottom:6px;">✅</div>
+      <div style="font-weight:800; font-size:14.5px;">تم إرسال طلبك بنجاح</div>
+      <p class="muted" style="font-size:12.5px; margin-top:6px;">سنتواصل معك قريبًا لتحديد موعد استشارتك مع ${REWARD_DOCTOR}. (نسخة تجريبية للعرض)</p>
+      <button class="btn secondary" style="margin-top:12px;" onclick="setState({rewardClaimed:false})">إغلاق</button>
+    </div>`;
+  }
+  if(pts>=REWARD_TARGET){
+    return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6;">
+      <div style="font-size:30px; margin-bottom:6px;">🎉</div>
+      <div style="font-weight:800; font-size:15.5px;">لقد فزت باستشارة مجانية!</div>
+      <div class="muted" style="font-size:12.5px; margin-top:4px;">مع ${REWARD_DOCTOR}، أخصائي نفسي</div>
+      <button class="btn amber" style="margin-top:14px;" onclick="claimReward()">احجز استشارتك الآن</button>
+    </div>`;
+  }
+  const pct = Math.min(100, Math.round((pts/REWARD_TARGET)*100));
+  return `<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-weight:700; font-size:14px;">🏆 نقاط المكافأة</span>
+      <span style="font-weight:800; color:var(--amber); font-size:14px;">${pts}/${REWARD_TARGET}</span>
+    </div>
+    <div style="height:8px; border-radius:5px; background:var(--sand-deep); overflow:hidden;">
+      <div style="height:100%; width:${pct}%; background:var(--amber); border-radius:5px; transition:width .6s ease;"></div>
+    </div>
+    <p class="muted" style="font-size:12px; margin-top:8px;">كل يوم تُكمله يمنحك 5 نقاط. اجمع ${REWARD_TARGET-pts} نقطة أخرى لتفوز باستشارة مجانية مع ${REWARD_DOCTOR}.</p>
+  </div>`;
+}
+async function claimReward(){
+  state.points = Math.max(0, (state.points||0) - REWARD_TARGET);
+  await setJson(`ansahni:points:${state.email}`, state.points);
+  setState({rewardClaimed:true});
+}
+function screenMorningAdhkar(){
+  return `
+  ${topbar('أذكار الصباح', "go('home')")}
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    ${MORNING_ADHKAR.map(a=>`<div class="card" style="font-family:'Amiri'; font-size:16.5px; line-height:2;">${a}</div>`).join('')}
+  </div>
+  <div style="height:10px;"></div>
+  <button class="btn" onclick="patchPlan({morningDone:true}); go('morning_planning')">أنهيت الأذكار، انتقل إلى المخطط</button>`;
+}
+function screenMorningPlanning(){
+  const tasks = state.plan.tasks;
+  return `
+  ${topbar('مخطط اليوم', "go('morning_adhkar')")}
+  <p class="muted" style="margin-bottom:10px; font-size:14px;">ماذا تريد إنجازه اليوم؟</p>
+  <div class="row" style="margin-bottom:14px;">
+    <input class="field" id="taskInput" placeholder="أضف مهمة..." onkeydown="if(event.key==='Enter')addTask()"/>
+    <button class="btn" style="width:52px; padding:0;" onclick="addTask()">+</button>
+  </div>
+  <div class="card">
+    ${tasks.length===0? `<p class="muted" style="font-size:13.5px;">لا توجد مهام بعد.</p>` :
+      tasks.map((t,i)=>`<div class="task-item"><div class="checkbox ${t.done?'done':''}" onclick="toggleTask(${i})">${t.done?ic.check:''}</div>
+      <span style="${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}">${t.title}</span></div>`).join('')}
+  </div>
+  <button class="btn" onclick="go('home')">حفظ المخطط والعودة</button>`;
+}
+const ACTIVITIES = [
+  {key:'breathing', title:'تمرين تنفس', icon:ic.spa},
+  {key:'walk', title:'مشي واعٍ', icon:ic.leaf},
+  {key:'gratitude', title:'الامتنان', icon:ic.heart},
+  {key:'reminder', title:'قراءة تذكير مفيد', icon:ic.book},
+  {key:'challenge', title:'تحدٍّ إيجابي صغير', icon:ic.trophy},
+];
+function screenLunchChoice(){
+  return `
+  ${topbar('استراحة الظهيرة', "go('home')")}
+  <p class="muted" style="margin-bottom:12px; font-size:14px;">اختر نشاطًا بسيطًا لهذه الاستراحة</p>
+  ${ACTIVITIES.map(a=>`
+  <div class="moment-card card" onclick="startLunchActivity('${a.key}')">
+    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${a.icon}</div>
+    <div class="moment-title">${a.title}</div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>`).join('')}`;
+}
+let breathingTimer=null, breathingSeconds=60;
+function startLunchActivity(key){
+  state.plan.lunchType = key; state.screen='lunch_activity';
+  if(key==='breathing'){ breathingSeconds=60; clearInterval(breathingTimer);
+    breathingTimer=setInterval(()=>{ breathingSeconds--; if(breathingSeconds<=0){clearInterval(breathingTimer);} render(); },1000);
+  }
+  render();
+}
+function screenLunchActivity(){
+  const key = state.plan.lunchType;
+  let body='';
+  if(key==='breathing'){
+    body = `<div style="text-align:center; padding-top:20px;">
+      <div style="color:var(--sage); margin-bottom:16px;">${ic.spa}</div>
+      <p style="font-size:15.5px;">تنفس بعمق... شهيق من الأنف، زفير من الفم</p>
+      <h1 style="font-size:44px; margin:20px 0; color:var(--sage-dark);">${Math.max(breathingSeconds,0)}</h1>
+      <p class="muted" style="font-size:13px;">ثانية متبقية</p></div>`;
+  } else if(key==='gratitude'){
+    body = `<p style="font-size:14.5px; margin-bottom:10px;">اذكر ثلاثة أشياء تشعر بالامتنان لها اليوم</p>
+    <textarea class="field" rows="5" placeholder="1...\n2...\n3..."></textarea>`;
+  } else {
+    const texts = {
+      walk:'قم بالمشي لمدة 5 دقائق، وركّز على كل خطوة، على تنفسك، وعلى ما تراه حولك دون تشتت.',
+      reminder:'"من كان يؤمن بالله واليوم الآخر فليقل خيرًا أو ليصمت." — تذكير بأهمية الكلمة الطيبة اليوم.',
+      challenge:'تحدٍّ اليوم: ابتسم لثلاثة أشخاص، أو أرسل رسالة شكر لشخص لم تشكره منذ مدة.'
+    };
+    body = `<div class="card" style="font-size:15.5px; line-height:1.8;">${texts[key]}</div>`;
+  }
+  return `${topbar('النشاط', "go('lunch_choice')")}${body}<div style="height:20px;"></div>
+  <button class="btn" onclick="clearInterval(breathingTimer); patchPlan({lunchDone:true}); go('home')">تم</button>`;
+}
+function screenEveningIntro(){
+  return `
+  ${topbar('نهاية اليوم', "go('home')")}
+  ${companionSpeech('سأرافقك الآن خطوة بخطوة، وسأعلّق على كل إجابة لمساعدتك على إعادة الصياغة.', 52)}
+  <div class="card" style="line-height:2; font-size:14.5px; margin-top:14px;">
+    ⏱ أقل من دقيقتين، في 5 خطوات قصيرة فقط:<br>
+    ١. الفكرة والشعور<br>٢. الأدلة معها وضدها<br>٣. هل ما زالت تخدمك؟<br>٤. إعادة الصياغة<br>٥. أذكار المساء وتنفس قبل النوم
+  </div>
+  <div class="card" style="border:1.5px dashed var(--sage-light);">
+    <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">📝 مثال سريع لتتضح الفكرة</div>
+    <div style="font-size:13px; line-height:2.1;">
+      <b>الفكرة التلقائية:</b> "لن أنجح مهما حاولت"<br>
+      <b>الشعور:</b> الحزن والأسى (65/100)<br>
+      <b>بعد إعادة الصياغة:</b> "قد أواجه صعوبات، لكن هذا لا يعني أنني سأفشل دائمًا"
+    </div>
+  </div>
+  <button class="btn" onclick="startEveningFlow()">فهمت، ابدأ</button>`;
+}
+const CBT_TOTAL_STEPS = 5;
+function cbtProgress(){
+  let segs=''; for(let i=0;i<CBT_TOTAL_STEPS;i++){ segs += `<div class="progress-seg ${i<=state.cbt.step?'active':''}"></div>`; }
+  return `<div class="progress-track">${segs}</div>`;
+}
+function reflectionView(){
+  const badge = state.cbt.reflectionAiUsed===true
+    ? `<div style="font-size:11px; color:var(--sage); font-weight:700; margin-bottom:6px;">✨ صياغة مباشرة من المساعد الذكي</div>`
+    : state.cbt.reflectionAiUsed===false
+      ? `<div style="font-size:11px; color:var(--danger); font-weight:700; margin-bottom:6px;">⚠️ تعذّر الاتصال بالذكاء الاصطناعي — نص افتراضي معروض</div>`
+      : '';
+  const tipSuggestion = (!state.cbt.reflectionLoading && state.cbt.step===1 && state.cbt.suggestedTip) ? `
+  <div class="moment-card card" style="margin-top:14px;" onclick="openTip('${state.cbt.suggestedTip.id}','cbt')">
+    <div class="moment-icon" style="background:var(--amber-light); color:var(--amber);">${ic.spark}</div>
+    <div><div class="moment-title" style="font-size:14px;">💡 نصيحة قد تساعدك الآن: ${state.cbt.suggestedTip.title}</div><div class="moment-sub">اضغط لعرض خطوات عملية</div></div>
+    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>` : '';
+  const speakBtn = (!state.cbt.reflectionLoading && state.cbt.reflectionText) ?
+    `<button class="icon-btn" style="width:24px; height:24px; flex-shrink:0;" title="استمع" onclick="speakById('${registerSpeak(state.cbt.reflectionText)}')">${ic.speaker}</button>` : '';
+  return `${cbtProgress()}
+  ${badge}
+  <div class="bubble">
+    ${companionAvatar(36)}
+    <div style="flex:1;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+        <div style="font-weight:700; font-size:12.5px; opacity:.8;">${COMPANION_NAME}</div>
+        ${speakBtn}
+      </div>
+      <div>${state.cbt.reflectionLoading? '...يفكّر معك الآن' : '"'+state.cbt.reflectionText+'"'}</div>
+    </div>
+  </div>
+  ${tipSuggestion}
+  <div style="height:30px;"></div>
+  <button class="btn" ${state.cbt.reflectionLoading?'disabled':''} onclick="cbtContinue()">متابعة</button>`;
+}
+async function nextWithReflection(promptContext, fallbackText){
+  setCbt({showReflection:true, reflectionLoading:true, reflectionText:'', reflectionAiUsed:null});
+  const result = await aiStepFeedback(promptContext, fallbackText);
+  setCbt({reflectionText:result.text, reflectionLoading:false, reflectionAiUsed:result.aiUsed});
+  if(state.autoSpeak) speakText(result.text);
+}
+async function cbtContinue(){
+  if(state.cbt.reflectionLoading) return;
+  if(state.cbt.step < CBT_TOTAL_STEPS-1){
+    setCbt({showReflection:false, step: state.cbt.step+1});
+  } else {
+    setCbt({showReflection:false});
+    setState({screen:'cbt_report'});
+    runAiReport();
+  }
+}
+function screenCbt(){
+  if(state.cbt.showReflection) return `${topbar('إعادة صياغة الأفكار', "go('evening_intro')")}${reflectionView()}`;
+  const s = state.cbt.step;
+  const ask = (text)=> `<div class="bubble" style="margin-bottom:16px;">${companionAvatar(30)}<div><div style="font-weight:700; font-size:12px; opacity:.8; margin-bottom:3px;">${COMPANION_NAME}</div><div>${text}</div></div></div>`;
+  let body='';
+  if(s===0){
+    body = `${ask('حدّثني... ما الفكرة التي راودتك؟ 💭')}
+    <textarea class="field" rows="4" id="cbtThought" placeholder="اكتب الفكرة كما جاءتك، بدون ترتيب...">${state.cbt.automaticThought}</textarea>
+    ${micButton('cbtThought')}
+    <p style="margin-top:16px; font-size:13.5px;">إلى أي درجة تصدّقها الآن؟</p>
+    <input type="range" min="0" max="100" value="${state.cbt.beliefBefore}" oninput="setCbt({beliefBefore:+this.value})"/>
+    <div class="slider-value">${state.cbt.beliefBefore} / 100</div>
+    <button class="btn" style="margin-top:18px;" onclick="cbtStep0Next()">التالي</button>`;
+  } else if(s===1){
+    body = `${ask('وما الشعور الذي رافق هذه الفكرة؟')}
+    <div class="chip-wrap">${EMOTIONS.map(e=>`<span class="chip ${state.cbt.emotion===e?'selected':''}" onclick="setCbt({emotion:'${e}'})">${e}</span>`).join('')}</div>
+    <p style="margin-top:18px; font-size:13.5px;">وبأي شدة تشعر به؟</p>
+    <input type="range" min="0" max="100" value="${state.cbt.emotionIntensity}" oninput="setCbt({emotionIntensity:+this.value})"/>
+    <div class="slider-value">${state.cbt.emotionIntensity} / 100</div>
+    <button class="btn" style="margin-top:18px;" onclick="cbtStep1Next()">التالي</button>`;
+  } else if(s===2){
+    body = `${ask('لنكن مثل محقق منصف قليلًا 🔍 ما الذي يدعم هذه الفكرة، وما الذي يعارضها؟')}
+    <p style="font-size:13px; font-weight:700; margin-bottom:6px;">أدلة تؤيدها</p>
+    <textarea class="field" rows="3" id="evFor" placeholder="اختياري...">${state.cbt.evidenceFor}</textarea>
+    ${micButton('evFor')}
+    <p style="font-size:13px; font-weight:700; margin:14px 0 6px;">أدلة تعارضها</p>
+    <textarea class="field" rows="3" id="evAgainst" placeholder="اختياري...">${state.cbt.evidenceAgainst}</textarea>
+    ${micButton('evAgainst')}
+    <button class="btn" style="margin-top:16px;" onclick="cbtStep2Next()">التالي</button>`;
+  } else if(s===3){
+    body = `${ask('سؤالان سريعان، ثم ننتقل مباشرة لإعادة الصياغة 👇')}
+    <p style="font-weight:700; font-size:14.5px; margin-bottom:8px;">هل ما زالت هذه الفكرة تنفعك الآن؟</p>
+    <div class="yn-row" style="margin-bottom:16px;">
+      <button class="yn-btn ${state.cbt.helpsNow===true?'selected':''}" onclick="setCbt({helpsNow:true})">نعم</button>
+      <button class="yn-btn ${state.cbt.helpsNow===false?'selected':''}" onclick="setCbt({helpsNow:false})">لا</button>
+    </div>
+    <p style="font-weight:700; font-size:14.5px; margin-bottom:8px;">هل تضرك الآن؟</p>
+    <div class="yn-row" style="margin-bottom:18px;">
+      <button class="yn-btn ${state.cbt.harmsNow===true?'selected':''}" onclick="setCbt({harmsNow:true})">نعم</button>
+      <button class="yn-btn ${state.cbt.harmsNow===false?'selected':''}" onclick="setCbt({harmsNow:false})">لا</button>
+    </div>
+    <p style="font-size:13px; font-weight:700; margin-bottom:8px;">هل تلاحظ نمط تفكير معينًا؟ (اختياري)</p>
+    <div class="chip-wrap">${THINKING_ERRORS.map(e=>`<span class="chip ${state.cbt.thinkingErrors.includes(e)?'selected':''}" onclick="toggleThinkingError('${e}')">${e}</span>`).join('')}</div>
+    <button class="btn" style="margin-top:20px;" ${(state.cbt.helpsNow===null||state.cbt.harmsNow===null)?'disabled':''} onclick="cbtStep3Next()">التالي</button>`;
+  } else {
+    const improved = state.cbt.beliefOldAfter < state.cbt.beliefBefore;
+    body = `${ask('الخطوة الأخيرة ✨ بناءً على كل ما قلته، كيف تعيد صياغة هذه الفكرة الآن؟')}
+    <textarea class="field" rows="3" id="newThought" placeholder="فكرة جديدة، أكثر واقعية...">${state.cbt.newThoughtUser}</textarea>
+    ${micButton('newThought')}
+    <p style="margin-top:14px; font-size:13px;">درجة تصديقك للفكرة الجديدة؟</p>
+    <input type="range" min="0" max="100" value="${state.cbt.beliefAfter}" oninput="setCbt({beliefAfter:+this.value})"/>
+    <div class="slider-value">${state.cbt.beliefAfter} / 100</div>
+    <p style="margin-top:14px; font-size:13px;">وكم أصبحت تصدّق الفكرة القديمة الآن؟</p>
+    <input type="range" min="0" max="100" value="${state.cbt.beliefOldAfter}" oninput="setCbt({beliefOldAfter:+this.value})"/>
+    <div class="slider-value">${state.cbt.beliefOldAfter} / 100</div>
+    ${improved?`<div class="bubble" style="margin-top:14px;"><span></span><span>لاحظ الفرق: من ${state.cbt.beliefBefore} إلى ${state.cbt.beliefOldAfter}. تقدّم حقيقي 👏</span></div>`:''}
+    <button class="btn" style="margin-top:20px;" onclick="cbtStep4Next()">إنهاء والانتقال إلى الملخص</button>`;
+  }
+  return `${topbar('إعادة صياغة الأفكار', "go('evening_intro')")}${cbtProgress()}${body}`;
+}
+
+/* ---- Étapes : chaque "next" appelle l'IA pour reformuler avant de continuer ---- */
+function cbtStep0Next(){
+  const val = document.getElementById('cbtThought').value.trim(); if(!val) return;
+  setCbt({automaticThought:val});
+  nextWithReflection(
+    `المستخدم شارك فكرة تلقائية راودته: "${val}" ودرجة اعتقاده بها ${state.cbt.beliefBefore}/100. اكتب تعليقًا داعمًا وقصيرًا (2-3 جمل) يطمئنه على أن هذه الأفكار طبيعية، دون إصدار أي حكم، ويمهّد بلطف للخطوة التالية (تحديد الشعور المرتبط بها).`,
+    'شكرًا لمشاركتك. من الطبيعي أن تراودنا أفكار كهذه أحيانًا. الخطوة التالية ستساعدك على فهم الشعور المرتبط بها بشكل أوضح.'
+  );
+}
+async function cbtStep1Next(){
+  if(!state.cbt.emotion) return;
+  setCbt({suggestedTip: findTipForEmotion(state.cbt.emotion), suggestedVideo:null});
+  nextWithReflection(
+    `المستخدم حدد شعوره بأنه "${state.cbt.emotion}" بشدة ${state.cbt.emotionIntensity}/100، مرتبطًا بالفكرة: "${state.cbt.automaticThought}". اكتب تعليقًا قصيرًا (2-3 جمل) يتقبّل هذا الشعور دون الحكم عليه، ويوضح بلطف أن الشعور بشيء لا يعني أن الفكرة المرتبطة به صحيحة بالضرورة.`,
+    `مشاعرك مفهومة ومقبولة. الشعور بـ"${state.cbt.emotion}" لا يعني أن الفكرة صحيحة بالضرورة. لنبحث الآن في الأدلة.`
+  );
+  const video = await pickRelevantVideo(state.cbt.automaticThought, state.cbt.emotion);
+  setCbt({suggestedVideo: video});
+}
+function cbtStep2Next(){
+  const evFor = document.getElementById('evFor').value.trim();
+  const evAgainst = document.getElementById('evAgainst').value.trim();
+  setCbt({evidenceFor:evFor, evidenceAgainst:evAgainst});
+  nextWithReflection(
+    `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لا شيء محدد'}"، وكأدلة معارضة: "${evAgainst||'لا شيء محدد'}". اكتب تعليقًا قصيرًا (2-4 جمل) يقدّر موضوعيته في النظر للجهتين، ويبرز بلطف ما تكشفه هذه الموازنة.`,
+    'موازنتك بين الأدلة المؤيدة والمعارضة خطوة مهمة نحو رؤية أكثر توازنًا.'
+  );
+}
+state.helpsNowText = () => state.cbt.helpsNow===true?'نعم':state.cbt.helpsNow===false?'لا':'غير محدد';
+state.harmsNowText = () => state.cbt.harmsNow===true?'نعم':state.cbt.harmsNow===false?'لا':'غير محدد';
+function toggleThinkingError(e){
+  const arr = state.cbt.thinkingErrors.includes(e) ? state.cbt.thinkingErrors.filter(x=>x!==e) : [...state.cbt.thinkingErrors, e];
+  setCbt({thinkingErrors:arr});
+}
+function cbtStep3Next(){
+  const errs = state.cbt.thinkingErrors;
+  nextWithReflection(
+    `أجاب المستخدم بأن الفكرة "${state.helpsNowText()}" تنفعه الآن، و"${state.harmsNowText()}" تضره، وحدد أخطاء التفكير التالية: ${errs.length? errs.join('، ') : 'لم يحدد أي خطأ تفكير معين'}. اكتب تعليقًا قصيرًا (2-4 جمل) يعزز وعيه بجدوى أو ضرر التمسك بهذه الفكرة، ويشير بلطف إلى فائدة ملاحظة نمط التفكير.`,
+    'وعيك بمدى فائدة أو ضرر هذه الفكرة، وبنمط تفكيرك، يمنحك قوة أكبر للتعامل معها.'
+  );
+}
+function cbtStep4Next(){
+  const val = document.getElementById('newThought').value.trim(); if(!val) return;
+  setCbt({newThoughtUser:val});
+  nextWithReflection(
+    `أعاد المستخدم صياغة فكرته الأصلية "${state.cbt.automaticThought}" إلى فكرة جديدة: "${val}" بدرجة اعتقاد ${state.cbt.beliefAfter}/100. كما أصبحت درجة اعتقاده بالفكرة القديمة ${state.cbt.beliefOldAfter}/100 بعد أن كانت ${state.cbt.beliefBefore}/100. اكتب تعليقًا قصيرًا (2-4 جمل): امدح الجهد، وإذا رأيت أن الصياغة يمكن أن تكون أكثر واقعية، اقترح بلطف تحسينًا موجزًا، ثم اختم بجملة تشير إلى أنك ستُعِدّ له الآن ملخصًا لهذه الجلسة.`,
+    'فكرة جميلة ومتوازنة، وهذا التغيير - مهما كان صغيرًا - نتيجة مجهودك الذهني اليوم. سأعدّ لك الآن ملخصًا لهذه الجلسة.'
+  );
+}
+
+/* ---- Appels IA réels (API Anthropic, disponible dans cet aperçu) ---- */
+const STEP_SYSTEM_PROMPT = `أنت مساعد نفسي داعم ضمن تطبيق "انصحني"، يرافق المستخدم في تمرين "تقييم الأفكار التلقائية" (CBT/ACT).
+اكتب حصرًا 2 إلى 4 جمل قصيرة بالعربية الفصحى البسيطة، بأسلوب دافئ ومحترم ومشجّع، دون أي مقدمات أو عناوين.
+لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا ولا تصف أدوية. لا تكرر كلام المستخدم حرفيًا، بل أعد صياغته بإيجاز.`;
+async function aiStepFeedback(promptContext, fallbackText){
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:220, system:STEP_SYSTEM_PROMPT, messages:[{role:"user", content:promptContext}] })
+    });
+    if(!res.ok){ throw new Error('HTTP '+res.status); }
+    const data = await res.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
+    if(!text) throw new Error('Réponse vide de l\'API');
+    console.log('[انصحني] رد الذكاء الاصطناعي (خطوة):', text);
+    return { text, aiUsed:true };
+  }catch(e){
+    console.error('[انصحني] فشل الاتصال بالذكاء الاصطناعي في هذه الخطوة:', e);
+    return { text:fallbackText, aiUsed:false };
+  }
+}
+
+const REPORT_SYSTEM_PROMPT = `أنت مساعد نفسي داعم ضمن تطبيق "انصحني". مهمتك إعداد ملخص ختامي لتمرين "تقييم الأفكار التلقائية" (CBT/ACT).
+قواعد صارمة: لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا. لا تصف أدوية. إذا لاحظت مؤشرات على أفكار إيذاء النفس أو انتحار أو ضيق شديد ومستمر، أو أن درجة الاعتقاد بالفكرة القديمة ما زالت مرتفعة جدًا رغم التمرين، ضع "professional_referral": true مع سبب واضح ومحترم. أسلوبك دافئ، محترم، مشجّع، مختصر. ساعد المستخدم على تقبّل نقاط ضعفه دون إنكارها أو الاستسلام لها.
+أجب حصرًا بصيغة JSON التالية دون أي نص إضافي: {"new_thought_ai":"...", "encouragement":"...", "acceptance_note":"...", "summary":"...", "professional_referral":false, "referral_reason":""}`;
+async function runAiReport(){
+  setState({aiLoading:true, aiError:'', aiReport:null});
+  const c = state.cbt;
+  const userMsg = `الفكرة التلقائية: ${c.automaticThought}
+درجة الاعتقاد بها قبل التمرين: ${c.beliefBefore}/100
+الشعور: ${c.emotion} (شدته: ${c.emotionIntensity}/100)
+الأدلة المؤيدة: ${c.evidenceFor}
+الأدلة المعارضة: ${c.evidenceAgainst}
+هل تنفعه الآن: ${state.helpsNowText()}
+هل تضره الآن: ${state.harmsNowText()}
+أخطاء التفكير: ${c.thinkingErrors.join('، ')||'لا شيء محدد'}
+الفكرة الجديدة: ${c.newThoughtUser}
+درجة الاعتقاد بالجديدة: ${c.beliefAfter}/100
+درجة الاعتقاد بالقديمة بعد التمرين: ${c.beliefOldAfter}/100`;
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:700, system:REPORT_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
+    });
+    const data = await res.json();
+    const raw = (data.content||[]).map(b=>b.text||'').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    setState({aiLoading:false, aiReport:parsed});
+    if(state.autoSpeak && parsed.summary) speakText(parsed.summary);
+  }catch(err){ console.error(err); setState({aiLoading:false, aiError:'تعذّر الاتصال بالمساعد الذكي حاليًا. حاول لاحقًا.'}); }
+}
+function screenCbtReport(){
+  let body='';
+  if(state.aiLoading){
+    body = `<div style="text-align:center; padding-top:60px;"><div class="spinner"></div><p class="muted" style="margin-top:16px;">جارٍ إعداد ملخص مخصص لك...</p></div>`;
+  } else if(state.aiError){
+    body = `<div style="text-align:center; padding-top:40px;">
+      <div style="color:var(--ink-soft); margin-bottom:10px;">${ic.alert}</div>
+      <p style="font-size:14px;">${state.aiError}</p>
+      <button class="btn" style="margin-top:16px;" onclick="runAiReport()">إعادة المحاولة</button></div>`;
+  } else if(state.aiReport){
+    const r = state.aiReport;
+    body = `
+    ${companionSpeech('إليك ملخص جلستنا اليوم، بناءً على ما شاركته معي الآن.', 40)}
+    ${r.professional_referral? `<div class="referral-box"><span>${ic.alert}</span><span>${r.referral_reason || 'يُنصح بالتحدث مع مختص (طبيب أو معالج نفسي) بخصوص ما تمر به.'}</span></div>`:''}
+    ${reportSection('الملخص', r.summary, ic.book)}
+    ${reportSection('الفكرة بعد إعادة الصياغة', r.new_thought_ai, ic.spark)}
+    ${reportSection('تقبّل الذات', r.acceptance_note, ic.heart)}
+    ${reportSection('كلمة تشجيع', r.encouragement, ic.trophy)}
+    ${giftCard()}
+    <button class="btn" style="margin-top:8px;" onclick="go('evening_adhkar')">متابعة إلى أذكار المساء</button>`;
+  }
+  return `${topbar('ملخص الجلسة', null)}${body}`;
+}
+function giftCard(){
+  const v = state.cbt.suggestedVideo;
+  if(!v) return '';
+  if(!state.cbt.giftOpened){
+    return `<div class="card" style="text-align:center; cursor:pointer; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1.5px dashed #F0DBA6;" onclick="setCbt({giftOpened:true})">
+      <div style="font-size:34px;">🎁</div>
+      <div style="font-weight:800; font-size:14.5px; margin-top:6px;">لديك هدية صغيرة من ${COMPANION_NAME}</div>
+      <p class="muted" style="font-size:12.5px; margin-top:4px;">اضغط لفتحها</p>
+    </div>`;
+  }
+  return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6; animation:fadeIn .5s ease;">
+    <div style="font-size:28px; margin-bottom:6px;">🎬</div>
+    <div style="font-weight:800; font-size:14.5px;">فيديو من د. فتحي سعيد قد يفيدك</div>
+    <p class="muted" style="font-size:13px; margin:6px 0 14px;">${v.title}</p>
+    <button class="btn amber" onclick="openVideo('${v.id}','cbt_report')">مشاهدة الفيديو ▶️</button>
+  </div>`;
+}
+function reportSection(title, text, icon){
+  if(!text || !text.trim()) return '';
+  return `<div class="card"><div class="report-section"><div class="report-icon">${icon}</div>
+    <div><div class="report-title">${title}</div><div class="report-text">${text}</div></div></div></div>`;
+}
+function screenEveningAdhkar(){
+  return `${topbar('أذكار المساء', null)}
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    ${EVENING_ADHKAR.map(a=>`<div class="card" style="font-family:'Amiri'; font-size:16.5px; line-height:2;">${a}</div>`).join('')}
+  </div>
+  <button class="btn" style="margin-top:10px;" onclick="patchPlan({eveningAdhkarDone:true}); go('day_eval')">أنهيت الأذكار</button>`;
+}
+
+/* ---- Évaluation de fin de journée avec cases à cocher ---- */
+function screenDayEval(){
+  const tasks = state.plan.tasks;
+  return `${topbar('تقييم اليوم', null)}
+  <p style="font-weight:700; font-size:15.5px; margin-bottom:10px;">راجع مخططك، وأكّد ما أنجزته فعلًا اليوم</p>
+  <div class="card">
+    ${tasks.length===0? `<p class="muted" style="font-size:13.5px;">لم تُضِف مهامًا هذا الصباح.</p>`:
+      tasks.map((t,i)=>`<div class="task-item"><div class="checkbox ${t.done?'done':''}" onclick="toggleEvalTask(${i})">${t.done?ic.check:''}</div><span style="${t.done?'text-decoration:line-through; opacity:.7;':''}">${t.title}</span></div>`).join('')}
+  </div>
+  <p style="font-weight:700; font-size:15.5px; margin:16px 0 10px;">كيف تقيّم يومك بشكل عام؟</p>
+  <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+    ${[1,2,3,4,5].map(v=>`<span class="star ${v<=state.plan.dayRating?'active':''}" onclick="setDayRating(${v})">★</span>`).join('')}
+  </div>
+  <textarea class="field" id="dayNotesInput" rows="3" placeholder="ملاحظة قصيرة عن يومك (اختياري)...">${state.plan.dayNotes}</textarea>
+  <button class="btn" style="margin-top:18px;" onclick="finishDayEval()">متابعة إلى تمرين التنفس</button>`;
+}
+function toggleEvalTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
+function setDayRating(v){ patchPlan({dayRating:v}); }
+function finishDayEval(){
+  const notes = document.getElementById('dayNotesInput').value.trim();
+  patchPlan({dayNotes:notes});
+  go('breathing');
+}
+
+/* ---- Respiration 3-7-8 ---- */
+let breathPhaseTimer=null;
+let breath = {phase:'inhale', seconds:3, cycles:4};
+const BREATH_DURATIONS = {inhale:3, hold:7, exhale:8};
+const BREATH_LABELS = {inhale:'شهيق من الأنف ببطء...', hold:'احبس النفس...', exhale:'زفير من الفم ببطء...'};
+function startBreathing(){
+  breath = {phase:'inhale', seconds:3, cycles:4};
+  clearInterval(breathPhaseTimer);
+  breathPhaseTimer = setInterval(()=>{
+    breath.seconds--;
+    if(breath.seconds<=0){
+      if(breath.phase==='inhale') breath.phase='hold';
+      else if(breath.phase==='hold') breath.phase='exhale';
+      else { breath.cycles--; if(breath.cycles<=0){ clearInterval(breathPhaseTimer); breath.phase='done'; onDayFinished(); return;} breath.phase='inhale'; }
+      breath.seconds = BREATH_DURATIONS[breath.phase] || 0;
+    }
+    render();
+  },1000);
+}
+function screenBreathing(){
+  if(breath.phase==='inhale' && breath.seconds===3 && !breathPhaseTimer) startBreathing();
+  if(breath.phase==='done') return screenDayFinished();
+  const scaleMap = {inhale: 130+40*(1-breath.seconds/3), hold:170, exhale: 170-40*(1-breath.seconds/8)};
+  const size = Math.round(scaleMap[breath.phase]||150);
+  return `${topbar('تنفس عميق', null)}
+  <div style="text-align:center; padding-top:20px;">
+    <div class="breath-circle" style="width:${size}px; height:${size}px;"><span class="breath-num">${breath.seconds}</span></div>
+    <p style="margin-top:26px; font-size:16px;">${BREATH_LABELS[breath.phase]}</p>
+    <p class="muted" style="margin-top:6px; font-size:13px;">الدورات المتبقية: ${breath.cycles}</p></div>`;
+}
+
+/* ---- Note du jour /100 + note IA personnalisée ---- */
+function computeDayScore(plan, cbtCompleted){
+  let score = 0;
+  score += plan.morningDone ? 15 : 0;
+  if(plan.tasks.length>0){ score += Math.round((plan.tasks.filter(t=>t.done).length/plan.tasks.length)*15); }
+  else { score += 8; }
+  score += plan.lunchDone ? 15 : 0;
+  score += cbtCompleted ? 20 : 0;
+  score += plan.eveningAdhkarDone ? 10 : 0;
+  score += true ? 10 : 0; // la respiration vient de se terminer à cet instant
+  score += plan.dayRating ? Math.round((plan.dayRating/5)*15) : 0;
+  return Math.min(100, score);
+}
+const NOTE_SYSTEM_PROMPT = `أنت مدرّب داعم ضمن تطبيق "انصحني". بناءً على ملخص يوم المستخدم ودرجته من 100، اكتب ملاحظة قصيرة (3-5 جمل) بالعربية:
+تقدّر ما أنجزه، وتذكر بلطف نقطة يمكن تحسينها غدًا، وتنهي بجملة تحفيزية. لا تقدّم تشخيصًا طبيًا أو نفسيًا. لا تستخدم رموزًا مثل JSON، اكتب نصًا عاديًا فقط.`;
+async function generateDailyNote(plan, score){
+  const summary = `أنجز المستخدم اليوم: أذكار الصباح: ${plan.morningDone?'نعم':'لا'}. المهام المنجزة: ${plan.tasks.filter(t=>t.done).length}/${plan.tasks.length}. نشاط الظهيرة: ${plan.lunchDone?'نعم':'لا'}. تمرين إعادة صياغة الأفكار: مكتمل. أذكار المساء: ${plan.eveningAdhkarDone?'نعم':'لا'}. تمرين التنفس: مكتمل. تقييمه الذاتي ليومه: ${plan.dayRating||'غير محدد'}/5. النقطة الإجمالية: ${score}/100.`;
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:260, system:NOTE_SYSTEM_PROMPT, messages:[{role:"user", content:summary}] })
+    });
+    const data = await res.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
+    return text || fallbackDailyNote(score);
+  }catch(e){ console.error(e); return fallbackDailyNote(score); }
+}
+function fallbackDailyNote(score){
+  if(score>=85) return 'يوم رائع! أنجزت جميع خطواتك تقريبًا بثبات جميل. استمر بهذا الإيقاع، فهو يبني عادات قوية مع الوقت.';
+  if(score>=60) return 'يوم جيد جدًا. أنجزت أغلب برنامجك، وهذا يستحق التقدير. حاول غدًا إكمال ما فاتك بخطوة صغيرة إضافية.';
+  if(score>=40) return 'لا بأس، كل يوم فيه تقدّم يُحسب، حتى لو كان بسيطًا. حاول غدًا أن تبدأ بخطوة واحدة تشعرك بالإنجاز.';
+  return 'يوم صعب، ولكنه ليس فشلًا. الاستمرار في المحاولة هو ما يصنع الفرق. غدًا فرصة جديدة، وأنت قادر عليها.';
+}
+async function onDayFinished(){
+  const cbtCompleted = !!state.aiReport;
+  const score = computeDayScore(state.plan, cbtCompleted);
+  patchPlan({score});
+  render(); // affiche l'écran final avec spinner pour la note IA
+  const note = await generateDailyNote(state.plan, score);
+  state.plan.dailyNote = note;
+  await patchPlan({dailyNote:note});
+  if(state.autoSpeak) speakText(note);
+  const history = state.scoreHistory.filter(h=>h.date!==todayStr());
+  history.push({date: todayStr(), score, note});
+  state.scoreHistory = history;
+  await setJson(`ansahni:scores:${state.email}`, history);
+  if(!state.plan.pointsAwarded){
+    state.points = (state.points||0) + 5;
+    await setJson(`ansahni:points:${state.email}`, state.points);
+    await patchPlan({pointsAwarded:true});
+  }
+  render();
+  launchConfetti();
+}
+function screenDayFinished(){
+  const score = state.plan.score;
+  return `${topbar('اكتمل يومك', null)}
+  <div class="confetti-wrap" id="confettiWrap"></div>
+  <div style="text-align:center; padding-top:20px;">
+    <div style="display:flex; justify-content:center; margin-bottom:10px;">${companionAvatar(56)}</div>
+    <h2 style="font-size:21px;">أحسنت! لقد أنهيت برنامج اليوم كاملًا.</h2>
+  </div>
+  <div class="card" style="text-align:center; margin-top:18px;">
+    ${score==null ? `<div class="spinner"></div><p class="muted" style="margin-top:10px; font-size:13px;">جارٍ حساب نقطتك...</p>` : `
+    <div class="score-badge" style="--pct:${score}; margin:0 auto;"><div class="score-badge-inner">${score}</div></div>
+    <p style="margin-top:12px; font-weight:700;">نقطتك اليوم من 100</p>
+    <div style="text-align:right; margin-top:14px;">${companionSpeech(state.plan.dailyNote || '...', 34)}</div>
+    ${state.plan.pointsAwarded ? `<div style="margin-top:12px; display:inline-block; background:var(--amber-light); color:var(--amber); font-weight:700; font-size:12.5px; padding:6px 14px; border-radius:999px;">+5 🏆 نقاط مكافأة</div>` : ''}`}
+  </div>
+  <button class="btn" style="margin-top:10px;" onclick="clearInterval(breathPhaseTimer); go('home')">العودة إلى الرئيسية</button>`;
+}
+function launchConfetti(){
+  const wrap = document.getElementById('confettiWrap');
+  if(!wrap) return;
+  const colors = ['#D98E3F','#2F6E5E','#F6E4CB','#E7E4F2'];
+  for(let i=0;i<26;i++){
+    const el = document.createElement('div');
+    el.className='confetti';
+    el.style.left = Math.random()*100+'%';
+    el.style.background = colors[i%colors.length];
+    el.style.animationDuration = (1.6+Math.random()*1.2)+'s';
+    el.style.animationDelay = (Math.random()*0.4)+'s';
+    wrap.appendChild(el);
+  }
+  setTimeout(()=>{ if(wrap) wrap.innerHTML=''; }, 3200);
+}
+
+/* ============================================================
+   PERSISTANCE (plan du jour + historique des notes)
+   ============================================================ */
+function planKey(email){ return `ansahni:plan:${email}:${todayStr()}`; }
+async function loadTodayPlan(email){
+  const saved = await getJson(planKey(email), null);
+  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
+  state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
+  state.points = await getJson(`ansahni:points:${email}`, 0);
+  state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, false);
+}
+async function patchPlan(patch){
+  state.plan = {...state.plan, ...patch};
+  render();
+  await setJson(planKey(state.email), state.plan);
+}
+function addTask(){
+  const input = document.getElementById('taskInput');
+  const val = input.value.trim(); if(!val) return;
+  state.plan.tasks.push({title:val, done:false});
+  patchPlan({tasks: state.plan.tasks});
+}
+function toggleTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
+
+async function startEveningFlow(){
+  state.cbt = { step:0, showReflection:false, reflectionText:'', reflectionLoading:false, automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50,
+    evidenceFor:'', evidenceAgainst:'', helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 };
+  state.aiReport = null; state.aiError='';
+  go('cbt');
+}
+
+/* ---- Entrée sans mot de passe : juste un email (compte créé automatiquement si absent) ---- */
+async function doEnter(){
+  const name = document.getElementById('fullname').value.trim();
+  const email = document.getElementById('email').value.trim();
+  if(!email){ setState({authError:'يرجى إدخال بريد إلكتروني للمتابعة'}); return; }
+  const accounts = await getJson('ansahni:accounts', {});
+  if(!accounts[email]) accounts[email] = { fullName:name };
+  else if(name) accounts[email].fullName = name;
+  await setJson('ansahni:accounts', accounts);
+  state.email = email; state.userName = accounts[email].fullName || email.split('@')[0];
+  await setJson('ansahni:session', {email});
+  await loadTodayPlan(email);
+  const onboarded = await getJson(`ansahni:onboarded:${email}`, false);
+  setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
+}
+async function doLogout(){
+  await setJson('ansahni:session', null);
+  state.email=''; state.userName='';
+  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
+  setState({screen:'login'});
+}
+
+/* ============================================================
+   ROUTEUR / RENDU
+   ============================================================ */
+function render(){
+  const rootEl = document.getElementById('appRoot');
+  rootEl.dataset.theme = themeForScreen(state.screen);
+  if(rootEl.dataset.theme==='evening') ensureStars();
+  document.getElementById('appHeader').innerHTML = renderHeader();
+  const el = document.getElementById('screen');
+  let html='';
+  switch(state.screen){
+    case 'login': html = screenLogin(); break;
+    case 'onboarding': html = screenOnboarding(); break;
+    case 'home': html = screenHome(); break;
+    case 'morning_adhkar': html = screenMorningAdhkar(); break;
+    case 'morning_planning': html = screenMorningPlanning(); break;
+    case 'lunch_choice': html = screenLunchChoice(); break;
+    case 'lunch_activity': html = screenLunchActivity(); break;
+    case 'evening_intro': html = screenEveningIntro(); break;
+    case 'cbt': html = screenCbt(); break;
+    case 'cbt_report': html = screenCbtReport(); break;
+    case 'evening_adhkar': html = screenEveningAdhkar(); break;
+    case 'day_eval': html = screenDayEval(); break;
+    case 'breathing': html = screenBreathing(); break;
+    case 'library': html = screenLibrary(); break;
+    case 'tip_detail': html = screenTipDetail(); break;
+    case 'video_library': html = screenVideoLibrary(); break;
+    case 'video_detail': html = screenVideoDetail(); break;
+    default: html = screenHome();
+  }
+  el.innerHTML = html;
+}
+
+/* ---- Initialisation : reprise de session depuis le cache ---- */
+(async function init(){
+  try{
+    const session = await getJson('ansahni:session', null);
+    if(session && session.email){
+      const accounts = await getJson('ansahni:accounts', {});
+      const acc = accounts[session.email];
+      state.email = session.email;
+      state.userName = (acc && acc.fullName) || session.email.split('@')[0];
+      await loadTodayPlan(session.email);
+      state.screen = 'home';
+    }
+  }catch(e){ console.error(e); }
+  render();
+})();
+</script>
+</body>
+</html>
