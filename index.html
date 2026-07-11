@@ -292,7 +292,7 @@ let state = {
     automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50, evidenceFor:'', evidenceAgainst:'',
     helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 },
   aiReport:null, aiLoading:false, aiError:'',
-  scoreHistory:[]
+  scoreHistory:[], autoSpeak:true
 };
 
 function setState(patch){ state = {...state, ...patch}; render(); }
@@ -713,18 +713,18 @@ const REWARD_DOCTOR = 'د. فتحي سعيد';
 function rewardsCard(){
   const pts = state.points||0;
   if(state.rewardClaimed){
-    return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6;">
+    return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6; color:var(--ink);">
       <div style="font-size:26px; margin-bottom:6px;">✅</div>
-      <div style="font-weight:800; font-size:14.5px;">تم إرسال طلبك بنجاح</div>
-      <p class="muted" style="font-size:12.5px; margin-top:6px;">سنتواصل معك قريبًا لتحديد موعد استشارتك مع ${REWARD_DOCTOR}. (نسخة تجريبية للعرض)</p>
+      <div style="font-weight:800; font-size:14.5px; color:var(--ink);">تم إرسال طلبك بنجاح</div>
+      <p style="font-size:12.5px; margin-top:6px; color:var(--ink-soft);">سنتواصل معك قريبًا لتحديد موعد استشارتك مع ${REWARD_DOCTOR}. (نسخة تجريبية للعرض)</p>
       <button class="btn secondary" style="margin-top:12px;" onclick="setState({rewardClaimed:false})">إغلاق</button>
     </div>`;
   }
   if(pts>=REWARD_TARGET){
-    return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6;">
+    return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6; color:var(--ink);">
       <div style="font-size:30px; margin-bottom:6px;">🎉</div>
-      <div style="font-weight:800; font-size:15.5px;">لقد فزت باستشارة مجانية!</div>
-      <div class="muted" style="font-size:12.5px; margin-top:4px;">مع ${REWARD_DOCTOR}، أخصائي نفسي</div>
+      <div style="font-weight:800; font-size:15.5px; color:var(--ink);">لقد فزت باستشارة مجانية!</div>
+      <div style="font-size:12.5px; margin-top:4px; color:var(--ink-soft);">مع ${REWARD_DOCTOR}، أخصائي نفسي</div>
       <button class="btn amber" style="margin-top:14px;" onclick="claimReward()">احجز استشارتك الآن</button>
     </div>`;
   }
@@ -856,6 +856,8 @@ function reflectionView(){
   </div>` : '';
   const speakBtn = (!state.cbt.reflectionLoading && state.cbt.reflectionText) ?
     `<button class="icon-btn" style="width:24px; height:24px; flex-shrink:0;" title="استمع" onclick="speakById('${registerSpeak(state.cbt.reflectionText)}')">${ic.speaker}</button>` : '';
+  const stepHint = (!state.cbt.reflectionLoading && state.cbt.step===2) ?
+    `<div style="font-size:11px; color:var(--amber); font-weight:700; margin-top:8px;">🌱 لاحظ: هناك خطوة صغيرة مقترحة في كلام ${COMPANION_NAME} أعلاه</div>` : '';
   return `${cbtProgress()}
   ${badge}
   <div class="bubble">
@@ -868,6 +870,7 @@ function reflectionView(){
       <div>${state.cbt.reflectionLoading? '...يفكّر معك الآن' : '"'+state.cbt.reflectionText+'"'}</div>
     </div>
   </div>
+  ${stepHint}
   ${tipSuggestion}
   <div style="height:30px;"></div>
   <button class="btn" ${state.cbt.reflectionLoading?'disabled':''} onclick="cbtContinue()">متابعة</button>`;
@@ -973,8 +976,8 @@ function cbtStep2Next(){
   const evAgainst = document.getElementById('evAgainst').value.trim();
   setCbt({evidenceFor:evFor, evidenceAgainst:evAgainst});
   nextWithReflection(
-    `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لا شيء محدد'}"، وكأدلة معارضة: "${evAgainst||'لا شيء محدد'}". اكتب تعليقًا قصيرًا (2-4 جمل) يقدّر موضوعيته في النظر للجهتين، ويبرز بلطف ما تكشفه هذه الموازنة.`,
-    'موازنتك بين الأدلة المؤيدة والمعارضة خطوة مهمة نحو رؤية أكثر توازنًا.'
+    `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لا شيء محدد'}"، وكأدلة معارضة: "${evAgainst||'لا شيء محدد'}". اكتب تعليقًا (3-4 جمل): قدّر موضوعيته في النظر للجهتين، وأبرز بلطف ما تكشفه هذه الموازنة. ثم أضف جملة أخيرة تقترح عليه خطوة عملية صغيرة واحدة جدًا (لا تأخذ أكثر من دقيقة أو دقيقتين) يمكنه تجربتها الآن أو خلال اليوم لاختبار مدى واقعية هذه الفكرة في الواقع، واجعل هذه الخطوة واضحة ومحددة وليست عامة.`,
+    'موازنتك بين الأدلة المؤيدة والمعارضة خطوة مهمة نحو رؤية أكثر توازنًا. كخطوة صغيرة، جرّب أن تسأل شخصًا تثق به عن رأيه الصادق في هذا الموقف اليوم.'
   );
 }
 state.helpsNowText = () => state.cbt.helpsNow===true?'نعم':state.cbt.helpsNow===false?'لا':'غير محدد';
@@ -1077,16 +1080,16 @@ function giftCard(){
   const v = state.cbt.suggestedVideo;
   if(!v) return '';
   if(!state.cbt.giftOpened){
-    return `<div class="card" style="text-align:center; cursor:pointer; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1.5px dashed #F0DBA6;" onclick="setCbt({giftOpened:true})">
+    return `<div class="card" style="text-align:center; cursor:pointer; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1.5px dashed #F0DBA6; color:var(--ink);" onclick="setCbt({giftOpened:true})">
       <div style="font-size:34px;">🎁</div>
-      <div style="font-weight:800; font-size:14.5px; margin-top:6px;">لديك هدية صغيرة من ${COMPANION_NAME}</div>
-      <p class="muted" style="font-size:12.5px; margin-top:4px;">اضغط لفتحها</p>
+      <div style="font-weight:800; font-size:14.5px; margin-top:6px; color:var(--ink);">لديك هدية صغيرة من ${COMPANION_NAME}</div>
+      <p style="font-size:12.5px; margin-top:4px; color:var(--ink-soft);">اضغط لفتحها</p>
     </div>`;
   }
-  return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6; animation:fadeIn .5s ease;">
+  return `<div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6; animation:fadeIn .5s ease; color:var(--ink);">
     <div style="font-size:28px; margin-bottom:6px;">🎬</div>
-    <div style="font-weight:800; font-size:14.5px;">فيديو من د. فتحي سعيد قد يفيدك</div>
-    <p class="muted" style="font-size:13px; margin:6px 0 14px;">${v.title}</p>
+    <div style="font-weight:800; font-size:14.5px; color:var(--ink);">فيديو من د. فتحي سعيد قد يفيدك</div>
+    <p style="font-size:13px; margin:6px 0 14px; color:var(--ink-soft);">${v.title}</p>
     <button class="btn amber" onclick="openVideo('${v.id}','cbt_report')">مشاهدة الفيديو ▶️</button>
   </div>`;
 }
@@ -1254,7 +1257,7 @@ async function loadTodayPlan(email){
   state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
   state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
   state.points = await getJson(`ansahni:points:${email}`, 0);
-  state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, false);
+  state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, true);
 }
 async function patchPlan(patch){
   state.plan = {...state.plan, ...patch};
