@@ -76,7 +76,9 @@ exports.handler = async function (event) {
 
 
     // Modèle Gemini
-    const model = "gemini-3.5-flash";
+    //const model = "gemini-3.5-flash";
+
+    const model = "gemini-2.0-flash";
 
 
     const response = await fetch(
