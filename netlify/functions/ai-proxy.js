@@ -18,7 +18,7 @@ exports.handler = async function (event) {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: "GEMINI_API_KEY manquante dans les variables d'environnement Netlify.",
+        error: "GEMINI_API_KEY manquante dans les variables Netlify.",
       }),
     };
   }
@@ -36,9 +36,9 @@ exports.handler = async function (event) {
     };
   }
 
-  const { system, messages } = payload;
+  const { system, messages, max_tokens } = payload;
 
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+  if (!messages || !Array.isArray(messages)) {
     return {
       statusCode: 400,
       body: JSON.stringify({
@@ -48,23 +48,27 @@ exports.handler = async function (event) {
   }
 
   try {
-    // Construction du prompt
     let prompt = "";
 
     if (system) {
       prompt += system + "\n\n";
     }
 
-    for (const msg of messages) {
+    messages.forEach((msg) => {
       if (msg.role === "user") {
-        prompt += `Utilisateur : ${msg.content}\n`;
-      } else if (msg.role === "assistant") {
-        prompt += `Assistant : ${msg.content}\n`;
+        prompt += `Utilisateur: ${msg.content}\n`;
       }
-    }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      if (msg.role === "assistant") {
+        prompt += `Assistant: ${msg.content}\n`;
+      }
+    });
+
+
+    const model = "gemini-3.5-flash";
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
@@ -81,28 +85,39 @@ exports.handler = async function (event) {
               ],
             },
           ],
+          generationConfig: {
+            maxOutputTokens: max_tokens || 500,
+          },
         }),
       }
     );
 
-    const data = await response.json();
 
-    if (!response.ok) {
-      console.error("Gemini Error:", data);
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error("Gemini API error:", JSON.stringify(data));
 
       return {
-        statusCode: response.status,
+        statusCode: res.status,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          error:
+            data.error?.message ||
+            "Erreur inconnue Gemini",
+        }),
       };
     }
 
-    const text =
-      data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    // On renvoie un format proche d'Anthropic
+    const text =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Aucune réponse générée.";
+
+
+    // Format compatible avec ton ancien code Claude
     return {
       statusCode: 200,
       headers: {
@@ -110,7 +125,7 @@ exports.handler = async function (event) {
       },
       body: JSON.stringify({
         id: "gemini-response",
-        model: "gemini-2.5-flash",
+        model,
         role: "assistant",
         content: [
           {
@@ -120,8 +135,11 @@ exports.handler = async function (event) {
         ],
       }),
     };
+
+
   } catch (err) {
-    console.error(err);
+
+    console.error("Server error:", err);
 
     return {
       statusCode: 500,
@@ -129,7 +147,7 @@ exports.handler = async function (event) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        error: err.message,
+        error: "Erreur serveur: " + err.message,
       }),
     };
   }
