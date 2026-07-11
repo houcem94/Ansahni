@@ -44,11 +44,14 @@ exports.handler = async function (event) {
       }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+
+    console.log("Anthropic status:", res.status);
+    console.log("Anthropic response:", text);
+    
     return {
       statusCode: res.status,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: text,
     };
   } catch (err) {
     console.error(err);
