@@ -1,6 +1,6 @@
 // netlify/functions/ai-proxy.js
 // Proxy sécurisé vers Google Gemini
-// La clé API reste uniquement côté serveur (Netlify).
+// La clé API reste uniquement côté serveur Netlify.
 
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") {
@@ -18,7 +18,7 @@ exports.handler = async function (event) {
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: "GEMINI_API_KEY manquante dans les variables Netlify.",
+        error: "GEMINI_API_KEY manquante dans Netlify.",
       }),
     };
   }
@@ -27,7 +27,7 @@ exports.handler = async function (event) {
 
   try {
     payload = JSON.parse(event.body || "{}");
-  } catch (e) {
+  } catch (error) {
     return {
       statusCode: 400,
       body: JSON.stringify({
@@ -36,7 +36,12 @@ exports.handler = async function (event) {
     };
   }
 
-  const { system, messages, max_tokens } = payload;
+  const {
+    system,
+    messages,
+    max_tokens
+  } = payload;
+
 
   if (!messages || !Array.isArray(messages)) {
     return {
@@ -47,34 +52,44 @@ exports.handler = async function (event) {
     };
   }
 
+
   try {
+
+    // Construction du prompt envoyé à Gemini
     let prompt = "";
 
     if (system) {
       prompt += system + "\n\n";
     }
 
-    messages.forEach((msg) => {
-      if (msg.role === "user") {
-        prompt += `Utilisateur: ${msg.content}\n`;
+    messages.forEach((message) => {
+
+      if (message.role === "user") {
+        prompt += "Utilisateur: " + message.content + "\n";
       }
 
-      if (msg.role === "assistant") {
-        prompt += `Assistant: ${msg.content}\n`;
+      if (message.role === "assistant") {
+        prompt += "Assistant: " + message.content + "\n";
       }
+
     });
 
 
+    // Modèle Gemini
     const model = "gemini-3.5-flash";
 
-    const res = await fetch(
+
+    const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
+
           contents: [
             {
               role: "user",
@@ -85,70 +100,127 @@ exports.handler = async function (event) {
               ],
             },
           ],
+
           generationConfig: {
-            maxOutputTokens: max_tokens || 500,
+
+            // Augmenté pour éviter les réponses coupées
+            maxOutputTokens: max_tokens || 2000,
+
+            temperature: 0.7,
+
           },
+
         }),
+
       }
     );
 
 
-    const data = await res.json();
+    const data = await response.json();
 
-    if (!res.ok) {
-      console.error("Gemini API error:", JSON.stringify(data));
+
+    console.log(
+      "Gemini status:",
+      response.status
+    );
+
+
+    console.log(
+      "Finish reason:",
+      data.candidates?.[0]?.finishReason
+    );
+
+
+    if (!response.ok) {
+
+      console.error(
+        "Gemini error:",
+        JSON.stringify(data)
+      );
+
 
       return {
-        statusCode: res.status,
+        statusCode: response.status,
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           error:
             data.error?.message ||
-            "Erreur inconnue Gemini",
+            "Erreur Gemini inconnue",
         }),
+
       };
     }
 
 
+    const candidate = data.candidates?.[0];
+
+
     const text =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Aucune réponse générée.";
+      candidate?.content?.parts
+        ?.map(part => part.text || "")
+        .join("")
+        ||
+        "Aucune réponse générée.";
 
 
-    // Format compatible avec ton ancien code Claude
     return {
+
       statusCode: 200,
+
       headers: {
         "Content-Type": "application/json",
       },
+
+
+      // Format compatible avec Claude
       body: JSON.stringify({
+
         id: "gemini-response",
-        model,
+
+        model: model,
+
         role: "assistant",
+
         content: [
           {
             type: "text",
-            text,
+            text: text,
           },
         ],
+
       }),
+
     };
 
 
-  } catch (err) {
+  } catch (error) {
 
-    console.error("Server error:", err);
+    console.error(
+      "Server error:",
+      error
+    );
+
 
     return {
+
       statusCode: 500,
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
-        error: "Erreur serveur: " + err.message,
+
+        error:
+          "Erreur serveur: " + error.message,
+
       }),
+
     };
+
   }
 };
