@@ -188,19 +188,98 @@ const store = {
 async function getJson(key, fallback){ const raw = await store.get(key); if(!raw) return fallback; try{ return JSON.parse(raw); }catch(e){ return fallback; } }
 async function setJson(key, value){ await store.set(key, JSON.stringify(value)); }
 
+/* ---- Supabase (mode réel) : renseignez ces deux valeurs pour activer un vrai
+   compte + une vraie base de données. Tant qu'elles ne sont pas renseignées,
+   l'app reste en "mode démo" (cache local uniquement, tel qu'actuellement). ---- */
+const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+const DEMO_MODE = SUPABASE_URL.includes('YOUR-PROJECT');
+let supabase = null;
+let currentUserId = null;
+
+/* ---- Accès BDD (utilisés uniquement quand DEMO_MODE est faux) ---- */
+async function dbLoadProfile(userId){
+  const { data, error } = await supabase.from('profiles').select().eq('id', userId).maybeSingle();
+  if(error){ console.error(error); return null; }
+  return data;
+}
+async function dbUpdateProfile(userId, fields){
+  try{ await supabase.from('profiles').update(fields).eq('id', userId); }catch(e){ console.error(e); }
+}
+async function dbLoadOrCreatePlan(userId, dateStr){
+  const { data: existing } = await supabase.from('daily_plans').select().eq('user_id', userId).eq('plan_date', dateStr).maybeSingle();
+  if(existing) return existing;
+  const { data: inserted, error } = await supabase.from('daily_plans').insert({ user_id:userId, plan_date:dateStr, tasks:[] }).select().single();
+  if(error){ console.error(error); return null; }
+  return inserted;
+}
+async function dbUpdatePlan(planId, fields){
+  try{ await supabase.from('daily_plans').update(fields).eq('id', planId); }catch(e){ console.error(e); }
+}
+async function dbLoadScoreHistory(userId){
+  const { data, error } = await supabase.from('daily_plans').select('plan_date, day_score, day_note')
+    .eq('user_id', userId).not('day_score','is',null).order('plan_date', { ascending:true });
+  if(error){ console.error(error); return []; }
+  return (data||[]).map(r=>({ date:r.plan_date, score:r.day_score, note:r.day_note }));
+}
+function planToDbFields(plan){
+  return {
+    morning_adhkar_done: plan.morningDone, tasks: plan.tasks,
+    lunch_activity_done: plan.lunchDone, lunch_activity_type: plan.lunchType,
+    evening_adhkar_done: plan.eveningAdhkarDone, breathing_exercise_done: plan.breathingDone,
+    day_rating: plan.dayRating || null, day_review_notes: plan.dayNotes || null,
+    day_score: plan.score, day_note: plan.dailyNote, points_awarded: plan.pointsAwarded
+  };
+}
+function mapDbPlanToState(row){
+  return {
+    id: row.id, morningDone: row.morning_adhkar_done, tasks: row.tasks || [],
+    lunchDone: row.lunch_activity_done, lunchType: row.lunch_activity_type,
+    eveningAdhkarDone: row.evening_adhkar_done, breathingDone: row.breathing_exercise_done,
+    dayRating: row.day_rating || 0, dayNotes: row.day_review_notes || '',
+    score: row.day_score, dailyNote: row.day_note, pointsAwarded: row.points_awarded || false
+  };
+}
+
 const todayStr = () => new Date().toISOString().substring(0,10);
 
 const EMOTIONS = ['الخزي والعار','الذنب','جلد الذات','الاحتقار','الحزن والأسى','الندم','الإشمئزاز','التوتر','الخوف','الغضب','الغيرة','النقص','الرفض','الكراهية','الحقد','الفوبيا','الشفقة'];
 const THINKING_ERRORS = ['التفكير الثنائي (أبيض أو أسود)','التهويل والتضخيم','التعميم المفرط','قراءة الأفكار','التنبؤ السلبي بالمستقبل','معايير "يجب" و"لازم"','التركيز على السلبي فقط','أخذ الأمور بشكل شخصي'];
 const MORNING_ADHKAR = [
-  'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ.',
-  'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ.',
-  'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ ﷺ نَبِيًّا وَرَسُولًا.'
+  'أَصْبَحْنَا عَلَى فِطْرَةِ الْإِسْلَامِ، وَكَلِمَةِ الْإِخْلَاصِ، وَدِينِ نَبِيِّنَا مُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ، وَمِلَّةِ إِبْرَاهِيمَ حَنِيفًا مُسْلِمًا وَمَا كَانَ مِنَ الْمُشْرِكِينَ.',
+  'اللَّهُمَّ فَاطِرَ السَّمَاوَاتِ وَالْأَرْضِ، عَالِمَ الْغَيْبِ وَالشَّهَادَةِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا أَنْتَ، أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي وَمِنْ شَرِّ الشَّيْطَانِ وَشِرْكِهِ، وَأَنْ أَقْتَرِفَ عَلَى نَفْسِي سُوءًا أَوْ أَجُرَّهُ إِلَى مُسْلِمٍ.',
+  'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ.',
+  'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ، عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ. (سبع مرات)',
+  'اللَّهُمَّ إِنِّي أَصْبَحْتُ أُشْهِدُكَ وَأُشْهِدُ حَمَلَةَ عَرْشِكَ، وَمَلَائِكَتَكَ وَجَمِيعَ خَلْقِكَ، أَنَّكَ أَنْتَ اللَّهُ لَا إِلَهَ إِلَّا أَنْتَ، وَأَنَّ مُحَمَّدًا عَبْدُكَ وَرَسُولُكَ. (أربع مرات)',
+  'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ نَبِيًّا.',
+  'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. (10 مرات)',
+  'بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ. (ثلاث مرات)',
+  'آيَةُ الْكُرْسِيِّ: اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ... (سورة البقرة، آية 255)',
+  'يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ، أَصْلِحْ لِي شَأْنِي كُلَّهُ وَلَا تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ أَبَدًا.',
+  'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ.',
+  'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ، اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي دِينِي وَدُنْيَايَ وَأَهْلِي وَمَالِي، اللَّهُمَّ اسْتُرْ عَوْرَاتِي وَآمِنْ رَوْعَاتِي، اللَّهُمَّ احْفَظْنِي مِنْ بَيْنِ يَدَيَّ وَمِنْ خَلْفِي وَعَنْ يَمِينِي وَعَنْ شِمَالِي وَمِنْ فَوْقِي، وَأَعُوذُ بِعَظَمَتِكَ أَنْ أُغْتَالَ مِنْ تَحْتِي.',
+  'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذَا الْيَوْمِ وَخَيْرَ مَا بَعْدَهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذَا الْيَوْمِ وَشَرِّ مَا بَعْدَهُ، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي الْقَبْرِ.',
+  'قُلْ هُوَ اللَّهُ أَحَدٌ.. قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ.. قُلْ أَعُوذُ بِرَبِّ النَّاسِ. (ثلاث مرات)',
+  'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. (100 مرة)',
+  'سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَاللَّهُ أَكْبَرُ. (100 مرة)'
 ];
 const EVENING_ADHKAR = [
-  'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ.',
-  'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ.',
-  'اللَّهُمَّ عَالِمَ الْغَيْبِ وَالشَّهَادَةِ، فَاطِرَ السَّمَاوَاتِ وَالْأَرْضِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ.'
+  'أَمْسَيْنَا عَلَى فِطْرَةِ الْإِسْلَامِ، وَكَلِمَةِ الْإِخْلَاصِ، وَدِينِ نَبِيِّنَا مُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ، وَمِلَّةِ إِبْرَاهِيمَ حَنِيفًا مُسْلِمًا وَمَا كَانَ مِنَ الْمُشْرِكِينَ.',
+  'اللَّهُمَّ فَاطِرَ السَّمَاوَاتِ وَالْأَرْضِ، عَالِمَ الْغَيْبِ وَالشَّهَادَةِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا أَنْتَ، أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي وَمِنْ شَرِّ الشَّيْطَانِ وَشِرْكِهِ، وَأَنْ أَقْتَرِفَ عَلَى نَفْسِي سُوءًا أَوْ أَجُرَّهُ إِلَى مُسْلِمٍ.',
+  'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ.',
+  'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ، عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ. (سبع مرات)',
+  'اللَّهُمَّ إِنِّي أَمْسَيْتُ أُشْهِدُكَ وَأُشْهِدُ حَمَلَةَ عَرْشِكَ، وَمَلَائِكَتَكَ وَجَمِيعَ خَلْقِكَ، أَنَّكَ أَنْتَ اللَّهُ لَا إِلَهَ إِلَّا أَنْتَ، وَأَنَّ مُحَمَّدًا عَبْدُكَ وَرَسُولُكَ. (أربع مرات)',
+  'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالْإِسْلَامِ دِينًا، وَبِمُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ نَبِيًّا.',
+  'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. (10 مرات)',
+  'بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ. (ثلاث مرات)',
+  'آيَةُ الْكُرْسِيِّ: اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ... (سورة البقرة، آية 255)',
+  'يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ، أَصْلِحْ لِي شَأْنِي كُلَّهُ وَلَا تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ أَبَدًا.',
+  'اللَّهُمَّ بِكَ أَمْسَيْنَا وَبِكَ نَحْيَا وَبِكَ نَمُوتُ وَإِلَيْكَ الْمَصِيرُ.',
+  'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ، اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي دِينِي وَدُنْيَايَ وَأَهْلِي وَمَالِي، اللَّهُمَّ اسْتُرْ عَوْرَاتِي وَآمِنْ رَوْعَاتِي، اللَّهُمَّ احْفَظْنِي مِنْ بَيْنِ يَدَيَّ وَمِنْ خَلْفِي وَعَنْ يَمِينِي وَعَنْ شِمَالِي وَمِنْ فَوْقِي، وَأَعُوذُ بِعَظَمَتِكَ أَنْ أُغْتَالَ مِنْ تَحْتِي.',
+  'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذِهِ اللَّيْلَةِ وَخَيْرَ مَا بَعْدَهَا، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذِهِ اللَّيْلَةِ وَشَرِّ مَا بَعْدَهَا، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي الْقَبْرِ.',
+  'قُلْ هُوَ اللَّهُ أَحَدٌ.. قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ.. قُلْ أَعُوذُ بِرَبِّ النَّاسِ. (ثلاث مرات)',
+  'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. (100 مرة)',
+  'سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَاللَّهُ أَكْبَرُ. (100 مرة)'
 ];
 
 /* ---------- بطاقات النصائح العملية (على غرار النموذج المرفق) ---------- */
@@ -341,7 +420,8 @@ function speakText(text){
 function speakById(id){ if(speakRegistry[id]) speakText(speakRegistry[id]); }
 function toggleAutoSpeak(){
   state.autoSpeak = !state.autoSpeak;
-  if(state.email) setJson(`ansahni:autospeak:${state.email}`, state.autoSpeak);
+  if(!DEMO_MODE && supabase && currentUserId){ dbUpdateProfile(currentUserId, {auto_speak: state.autoSpeak}); }
+  else if(state.email){ setJson(`ansahni:autospeak:${state.email}`, state.autoSpeak); }
   if(!state.autoSpeak && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   render();
 }
@@ -383,6 +463,7 @@ function micButton(targetId){
     <button id="${btnId}" class="icon-btn" title="تسجيل صوتي" onclick="startVoiceInput('${targetId}','${btnId}')">${ic.mic}</button>
   </div>`;
 }
+const DR_FATHI_PHOTO_SRC = 'data:image/jpeg;base64,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';
 const COMPANION_AVATAR_SRC = 'data:image/jpeg;base64,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';
 function companionAvatar(size){
   size = size || 32;
@@ -405,7 +486,7 @@ function companionSpeech(text, size){
 }
 
 function renderHeader(){
-  const loggedIn = !['login','onboarding'].includes(state.screen);
+  const loggedIn = !['login','onboarding','signup'].includes(state.screen);
   return `<div class="brand"><span class="brand-dot"></span>انصحني</div>
   ${loggedIn ? `<div class="header-actions">
     <button class="icon-btn" title="${state.autoSpeak?'إيقاف نطق ردود '+COMPANION_NAME:'تفعيل نطق ردود '+COMPANION_NAME}"
@@ -418,7 +499,7 @@ function renderHeader(){
 /* ---------- THÈME PAR AMBIANCE (matin / midi / soir) ---------- */
 function themeForScreen(s){
   if(['morning_adhkar','morning_planning'].includes(s)) return 'morning';
-  if(['lunch_choice','lunch_activity'].includes(s)) return 'midday';
+  if(['lunch_choice','lunch_activity','lunch_today'].includes(s)) return 'midday';
   if(['evening_intro','cbt','cbt_report','evening_adhkar','day_eval','breathing'].includes(s)) return 'evening';
   return 'neutral';
 }
@@ -444,7 +525,7 @@ function currentTimeSlot(){
 }
 const SLOT_META = {
   morning:{ emoji:'☀️', label:'الصباح', title:'حان وقت بداية يومك', text:'أذكار الصباح، ثم تحضير مخطط بسيط لمهامك.', action:"go('morning_adhkar')", cta:'ابدأ صباحك', bg:'linear-gradient(135deg,#FDF3E0,#F8E7C4)', color:'var(--amber)' },
-  midday:{ emoji:'🌿', label:'الظهيرة', title:'حان وقت استراحة قصيرة', text:'نشاط بسيط لخمس دقائق يعيد لك توازنك.', action:"go('lunch_choice')", cta:'خذ استراحتك', bg:'linear-gradient(135deg,#EAF4EE,#DCEEE4)', color:'var(--sage)' },
+  midday:{ emoji:'🌿', label:'الظهيرة', title:'حان وقت استراحة قصيرة', text:'نشاط بسيط لخمس دقائق يعيد لك توازنك.', action:"go('lunch_today')", cta:'خذ استراحتك', bg:'linear-gradient(135deg,#EAF4EE,#DCEEE4)', color:'var(--sage)' },
   evening:{ emoji:'🌙', label:'المساء', title:'حان وقت مراجعة يومك', text:'إعادة صياغة الأفكار، أذكار المساء، وتنفس قبل النوم.', action:"go('evening_intro')", cta:'ابدأ مساءك', bg:'linear-gradient(135deg,#E7E4F2,#F3EFE4)', color:'var(--dusk)' }
 };
 function heroCard(){
@@ -613,7 +694,8 @@ function onboardingNext(){
   else { finishOnboarding(); }
 }
 async function finishOnboarding(){
-  await setJson(`ansahni:onboarded:${state.email}`, true);
+  if(!DEMO_MODE && supabase && currentUserId){ await dbUpdateProfile(currentUserId, {onboarded:true}); }
+  else{ await setJson(`ansahni:onboarded:${state.email}`, true); }
   setState({screen:'home', onboardingIndex:0});
 }
 
@@ -629,18 +711,56 @@ function topbar(title, onBack, onLogout){
    ÉCRANS
    ============================================================ */
 function screenLogin(){
-  return `
+  const intro = `
   <div style="text-align:center; padding:34px 0 6px;">
-    <div class="auth-logo" style="color:#fff; margin:0 auto 14px;">${ic.spa}</div>
+    <div style="display:flex; justify-content:center; margin-bottom:14px;">${companionAvatar(96)}</div>
     <h1 style="font-size:34px; color:var(--sage-dark);">انصحني</h1>
     <p class="muted" style="margin-top:8px; font-size:14px;">مرافقك اليومي للتحسّن التدريجي</p>
-  </div>
+    <p style="margin:16px auto 0; max-width:340px; font-size:13.5px; line-height:1.9; color:var(--ink-soft);">
+      كل يوم معك: أذكار الصباح وتخطيط بسيط، استراحة منتصف اليوم، وفي المساء
+      يرافقك <b style="color:var(--sage-dark);">${COMPANION_NAME}</b> خطوة بخطوة لإعادة صياغة أفكارك بلطف —
+      حتى تنام مرتاح البال، وتتابع تطورك يومًا بعد يوم. 🌿
+    </p>
+  </div>`;
+  const footer = `
+  <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:28px;">
+    <img src="${DR_FATHI_PHOTO_SRC}" alt="د. فتحي سعيد" style="width:34px; height:34px; border-radius:50%; object-fit:cover; box-shadow:0 3px 8px rgba(31,45,40,.15);" />
+    <p class="muted" style="font-size:11.5px; line-height:1.7;">بالتعاون مع د. فتحي سعيد<br>ومركز الإرشاد النفسي</p>
+  </div>`;
+  const showReal = !DEMO_MODE || state.previewRealAuth;
+  if(!showReal){
+    return `${intro}
+    <div class="card" style="max-width:420px; margin:22px auto 0; display:flex; flex-direction:column; gap:12px;">
+      <input class="field" id="fullname" placeholder="اسمك (اختياري)" />
+      <input class="field" id="email" placeholder="البريد الإلكتروني" />
+      ${state.authError? `<div class="error-text">${state.authError}</div>`:''}
+      <button class="btn" onclick="doEnterDemo()">دخول</button>
+      <p class="muted" style="text-align:center; font-size:12px; margin-top:2px;">لا حاجة لكلمة مرور في هذه النسخة — فقط أدخل بريدك للمتابعة.</p>
+      <button class="link-btn" onclick="setState({previewRealAuth:true})">معاينة شكل تسجيل الدخول في النسخة النهائية →</button>
+    </div>
+    ${footer}`;
+  }
+  return `${intro}
   <div class="card" style="max-width:420px; margin:22px auto 0; display:flex; flex-direction:column; gap:12px;">
-    <input class="field" id="fullname" placeholder="اسمك (اختياري)" />
+    ${DEMO_MODE ? `<div style="font-size:11px; color:var(--amber); font-weight:700; text-align:center;">👁️ معاينة الشكل فقط — أي بريد وكلمة مرور سيدخلانك حاليًا</div>`:''}
     <input class="field" id="email" placeholder="البريد الإلكتروني" />
+    <input class="field" id="password" type="password" placeholder="كلمة المرور" />
     ${state.authError? `<div class="error-text">${state.authError}</div>`:''}
-    <button class="btn" onclick="doEnter()">دخول</button>
-    <p class="muted" style="text-align:center; font-size:12px; margin-top:2px;">لا حاجة لكلمة مرور في هذه النسخة — فقط أدخل بريدك للمتابعة.</p>
+    <button class="btn" onclick="doLogin()">تسجيل الدخول</button>
+    <button class="link-btn" onclick="go('signup')">ليس لديك حساب؟ أنشئ حسابًا جديدًا</button>
+    ${DEMO_MODE ? `<button class="link-btn" onclick="setState({previewRealAuth:false})">← رجوع للنسخة التجريبية</button>`:''}
+  </div>
+  ${footer}`;
+}
+function screenSignup(){
+  return `
+  ${topbar('إنشاء حساب جديد', "go('login')")}
+  <div class="card" style="max-width:420px; margin:10px auto 0; display:flex; flex-direction:column; gap:12px;">
+    <input class="field" id="fullname" placeholder="اسمك" />
+    <input class="field" id="email" placeholder="البريد الإلكتروني" />
+    <input class="field" id="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" />
+    ${state.authError? `<div class="error-text">${state.authError}</div>`:''}
+    <button class="btn" onclick="doSignup()">إنشاء الحساب</button>
   </div>`;
 }
 function screenHome(){
@@ -661,6 +781,7 @@ function screenHome(){
     <div><div style="font-weight:800; font-size:16.5px;">${streak} ${streak===1?'يوم متتالٍ':'أيام متتالية'}</div><div class="muted" style="font-size:12px; margin-top:2px;">حافظ على استمراريتك، يومًا بعد يوم</div></div>
   </div>` : ''}
   ${heroCard()}
+  ${tasksReminderCard()}
   ${today ? `<div class="card" style="display:flex; align-items:center; gap:14px;">
     <div class="score-badge" style="--pct:${today.score};"><div class="score-badge-inner">${today.score}</div></div>
     <div><div style="font-weight:700; font-size:14.5px;">نقطتك اليوم</div><div class="muted" style="font-size:12.5px; margin-top:3px;">${today.note ? today.note.slice(0,60)+'…' : 'أحسنت على مجهودك اليوم'}</div></div>
@@ -674,7 +795,7 @@ function screenHome(){
     <div><div class="moment-title">بداية اليوم</div><div class="moment-sub">أذكار الصباح وتحضير المخطط</div></div>
     <div class="check" style="color:${p.morningDone?'var(--sage)':'#CFC8B4'};">${p.morningDone?ic.check:ic.arrow}</div>
   </div>
-  <div class="moment-card card" onclick="go('lunch_choice')">
+  <div class="moment-card card" onclick="go('lunch_today')">
     <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${ic.spa}</div>
     <div><div class="moment-title">استراحة الظهيرة</div><div class="moment-sub">نشاط قصير: تنفس، امتنان، مشي...</div></div>
     <div class="check" style="color:${p.lunchDone?'var(--sage)':'#CFC8B4'};">${p.lunchDone?ic.check:ic.arrow}</div>
@@ -696,8 +817,25 @@ function screenHome(){
     <div class="moment-icon" style="background:var(--dusk-light); color:var(--dusk);">▶️</div>
     <div><div class="moment-title">نصائح د. فتحي بالفيديو</div><div class="moment-sub">${DR_VIDEOS.length? 'فيديوهات قصيرة تناسب حالتك':'قريبًا'}</div></div>
     <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  </div>
+  <p class="muted" style="text-align:center; font-size:11.5px; margin-top:22px; line-height:1.8;">
+    بالتعاون مع د. فتحي سعيد<br>ومركز الإرشاد النفسي
+  </p>`;
+}
+function tasksReminderCard(){
+  const tasks = state.plan.tasks;
+  if(!tasks || tasks.length===0) return '';
+  const pending = tasks.filter(t=>!t.done).length;
+  return `<div class="card">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+      ${companionAvatar(30)}
+      <div style="font-weight:700; font-size:14px;">${pending>0 ? `لا تنسَ، بقي ${pending} من مهامك اليوم:` : 'أحسنت، أنجزت كل مهامك اليوم! 🎉'}</div>
+    </div>
+    ${tasks.map((t,i)=>`<div class="task-item"><div class="checkbox ${t.done?'done':''}" onclick="toggleHomeTask(${i})">${t.done?ic.check:''}</div>
+      <span style="${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}">${t.title}</span></div>`).join('')}
   </div>`;
 }
+function toggleHomeTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
 function tipOfDayCard(){
   const t = pickTipOfDay();
   return `<div class="moment-card card" onclick="openTip('${t.id}','home')">
@@ -742,17 +880,18 @@ function rewardsCard(){
 }
 async function claimReward(){
   state.points = Math.max(0, (state.points||0) - REWARD_TARGET);
-  await setJson(`ansahni:points:${state.email}`, state.points);
+  if(!DEMO_MODE && supabase && currentUserId){ await dbUpdateProfile(currentUserId, {points: state.points}); }
+  else{ await setJson(`ansahni:points:${state.email}`, state.points); }
   setState({rewardClaimed:true});
 }
 function screenMorningAdhkar(){
   return `
   ${topbar('أذكار الصباح', "go('home')")}
-  <div style="display:flex; flex-direction:column; gap:12px;">
-    ${MORNING_ADHKAR.map(a=>`<div class="card" style="font-family:'Amiri'; font-size:16.5px; line-height:2;">${a}</div>`).join('')}
+  <div class="card">
+    <p style="font-weight:700; color:var(--sage-dark); text-align:center; margin-bottom:16px; font-size:14px;">خذ نفسًا هادئًا، وابدأ يومك بذكر الله 🌿</p>
+    ${MORNING_ADHKAR.map((a,i)=>`<p style="font-family:'Amiri'; font-size:16px; line-height:2.15; margin:0 0 ${i<MORNING_ADHKAR.length-1?'16px':'0'}; ${i<MORNING_ADHKAR.length-1?'padding-bottom:16px; border-bottom:1px solid var(--sand-deep);':''}">${a}</p>`).join('')}
   </div>
-  <div style="height:10px;"></div>
-  <button class="btn" onclick="patchPlan({morningDone:true}); go('morning_planning')">أنهيت الأذكار، انتقل إلى المخطط</button>`;
+  <button class="btn" style="margin-top:14px;" onclick="patchPlan({morningDone:true}); go('morning_planning')">أنهيت الأذكار، انتقل إلى المخطط</button>`;
 }
 function screenMorningPlanning(){
   const tasks = state.plan.tasks;
@@ -777,6 +916,19 @@ const ACTIVITIES = [
   {key:'reminder', title:'قراءة تذكير مفيد', icon:ic.book},
   {key:'challenge', title:'تحدٍّ إيجابي صغير', icon:ic.trophy},
 ];
+function pickLunchActivityOfDay(){ return ACTIVITIES[new Date().getDate() % ACTIVITIES.length]; }
+function screenLunchToday(){
+  const a = pickLunchActivityOfDay();
+  return `
+  ${topbar('استراحة الظهيرة', "go('home')")}
+  ${companionSpeech(`اخترت لك هذا النشاط اليوم، أعتقد أنك ستحبه: ${a.title} 🌿`, 44)}
+  <div class="moment-card card" style="margin-top:16px; cursor:default;">
+    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${a.icon}</div>
+    <div class="moment-title">${a.title}</div>
+  </div>
+  <button class="btn" style="margin-top:16px;" onclick="startLunchActivity('${a.key}')">ابدأ النشاط</button>
+  <button class="link-btn" style="margin-top:10px; display:block; text-align:center; width:100%;" onclick="go('lunch_choice')">🔄 أو اختر نشاطًا آخر بنفسك</button>`;
+}
 function screenLunchChoice(){
   return `
   ${topbar('استراحة الظهيرة', "go('home')")}
@@ -1100,10 +1252,11 @@ function reportSection(title, text, icon){
 }
 function screenEveningAdhkar(){
   return `${topbar('أذكار المساء', null)}
-  <div style="display:flex; flex-direction:column; gap:12px;">
-    ${EVENING_ADHKAR.map(a=>`<div class="card" style="font-family:'Amiri'; font-size:16.5px; line-height:2;">${a}</div>`).join('')}
+  <div class="card">
+    <p style="font-weight:700; text-align:center; margin-bottom:16px; font-size:14px; color:var(--amber-light);">اختم يومك بسكينة، واقرأها بحضور قلب 🌙</p>
+    ${EVENING_ADHKAR.map((a,i)=>`<p style="font-family:'Amiri'; font-size:16px; line-height:2.15; margin:0 0 ${i<EVENING_ADHKAR.length-1?'16px':'0'}; ${i<EVENING_ADHKAR.length-1?'padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,.1);':''}">${a}</p>`).join('')}
   </div>
-  <button class="btn" style="margin-top:10px;" onclick="patchPlan({eveningAdhkarDone:true}); go('day_eval')">أنهيت الأذكار</button>`;
+  <button class="btn" style="margin-top:14px;" onclick="patchPlan({eveningAdhkarDone:true}); go('day_eval')">أنهيت الأذكار</button>`;
 }
 
 /* ---- Évaluation de fin de journée avec cases à cocher ---- */
@@ -1197,7 +1350,7 @@ function fallbackDailyNote(score){
 async function onDayFinished(){
   const cbtCompleted = !!state.aiReport;
   const score = computeDayScore(state.plan, cbtCompleted);
-  patchPlan({score});
+  await patchPlan({score});
   render(); // affiche l'écran final avec spinner pour la note IA
   const note = await generateDailyNote(state.plan, score);
   state.plan.dailyNote = note;
@@ -1206,10 +1359,11 @@ async function onDayFinished(){
   const history = state.scoreHistory.filter(h=>h.date!==todayStr());
   history.push({date: todayStr(), score, note});
   state.scoreHistory = history;
-  await setJson(`ansahni:scores:${state.email}`, history);
+  if(DEMO_MODE || !supabase){ await setJson(`ansahni:scores:${state.email}`, history); }
   if(!state.plan.pointsAwarded){
     state.points = (state.points||0) + 5;
-    await setJson(`ansahni:points:${state.email}`, state.points);
+    if(!DEMO_MODE && supabase && currentUserId){ await dbUpdateProfile(currentUserId, {points: state.points}); }
+    else { await setJson(`ansahni:points:${state.email}`, state.points); }
     await patchPlan({pointsAwarded:true});
   }
   render();
@@ -1253,6 +1407,12 @@ function launchConfetti(){
    ============================================================ */
 function planKey(email){ return `ansahni:plan:${email}:${todayStr()}`; }
 async function loadTodayPlan(email){
+  if(!DEMO_MODE && supabase && currentUserId){
+    const row = await dbLoadOrCreatePlan(currentUserId, todayStr());
+    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
+    state.scoreHistory = await dbLoadScoreHistory(currentUserId);
+    return;
+  }
   const saved = await getJson(planKey(email), null);
   state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
   state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
@@ -1262,6 +1422,10 @@ async function loadTodayPlan(email){
 async function patchPlan(patch){
   state.plan = {...state.plan, ...patch};
   render();
+  if(!DEMO_MODE && supabase && state.plan.id){
+    await dbUpdatePlan(state.plan.id, planToDbFields(state.plan));
+    return;
+  }
   await setJson(planKey(state.email), state.plan);
 }
 function addTask(){
@@ -1280,7 +1444,7 @@ async function startEveningFlow(){
 }
 
 /* ---- Entrée sans mot de passe : juste un email (compte créé automatiquement si absent) ---- */
-async function doEnter(){
+async function doEnterDemo(){
   const name = document.getElementById('fullname').value.trim();
   const email = document.getElementById('email').value.trim();
   if(!email){ setState({authError:'يرجى إدخال بريد إلكتروني للمتابعة'}); return; }
@@ -1294,8 +1458,59 @@ async function doEnter(){
   const onboarded = await getJson(`ansahni:onboarded:${email}`, false);
   setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
 }
+async function previewAuthEnter(email, name){
+  const accounts = await getJson('ansahni:accounts', {});
+  if(!accounts[email]) accounts[email] = { fullName:name };
+  else if(name) accounts[email].fullName = name;
+  await setJson('ansahni:accounts', accounts);
+  state.email = email; state.userName = accounts[email].fullName || email.split('@')[0];
+  await setJson('ansahni:session', {email});
+  await loadTodayPlan(email);
+  const onboarded = await getJson(`ansahni:onboarded:${email}`, false);
+  setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:'', previewRealAuth:false});
+}
+async function doLogin(){
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!email || !password){ setState({authError:'يرجى إدخال البريد الإلكتروني وكلمة المرور'}); return; }
+  if(!supabase){ await previewAuthEnter(email, ''); return; }
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if(error){ setState({authError:'البريد الإلكتروني أو كلمة المرور غير صحيحة'}); return; }
+  await afterAuthSuccess(data.user);
+}
+async function doSignup(){
+  const name = document.getElementById('fullname').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!email || password.length<6){ setState({authError:'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل'}); return; }
+  if(!supabase){ await previewAuthEnter(email, name); return; }
+  const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ full_name:name } } });
+  if(error){ setState({authError:'تعذّر إنشاء الحساب: '+error.message}); return; }
+  if(!data.user){ setState({authError:'', screen:'login'}); alert('تحقق من بريدك الإلكتروني لتأكيد الحساب.'); render(); return; }
+  await afterAuthSuccess(data.user);
+}
+async function afterAuthSuccess(user){
+  currentUserId = user.id;
+  state.email = user.email;
+  let profile = await dbLoadProfile(user.id);
+  if(!profile){ // trigger éventuellement pas encore exécuté
+    await new Promise(r=>setTimeout(r,600));
+    profile = await dbLoadProfile(user.id);
+  }
+  state.userName = (profile && profile.full_name) || (user.user_metadata && user.user_metadata.full_name) || user.email.split('@')[0];
+  state.points = (profile && profile.points) || 0;
+  state.autoSpeak = profile ? profile.auto_speak : true;
+  await loadTodayPlan(user.email);
+  const onboarded = profile ? profile.onboarded : false;
+  setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
+}
 async function doLogout(){
-  await setJson('ansahni:session', null);
+  if(DEMO_MODE){
+    await setJson('ansahni:session', null);
+  } else if(supabase){
+    try{ await supabase.auth.signOut(); }catch(e){ console.error(e); }
+    currentUserId = null;
+  }
   state.email=''; state.userName='';
   state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
   setState({screen:'login'});
@@ -1313,10 +1528,12 @@ function render(){
   let html='';
   switch(state.screen){
     case 'login': html = screenLogin(); break;
+    case 'signup': html = screenSignup(); break;
     case 'onboarding': html = screenOnboarding(); break;
     case 'home': html = screenHome(); break;
     case 'morning_adhkar': html = screenMorningAdhkar(); break;
     case 'morning_planning': html = screenMorningPlanning(); break;
+    case 'lunch_today': html = screenLunchToday(); break;
     case 'lunch_choice': html = screenLunchChoice(); break;
     case 'lunch_activity': html = screenLunchActivity(); break;
     case 'evening_intro': html = screenEveningIntro(); break;
@@ -1337,16 +1554,25 @@ function render(){
 /* ---- Initialisation : reprise de session depuis le cache ---- */
 (async function init(){
   try{
-    const session = await getJson('ansahni:session', null);
-    if(session && session.email){
-      const accounts = await getJson('ansahni:accounts', {});
-      const acc = accounts[session.email];
-      state.email = session.email;
-      state.userName = (acc && acc.fullName) || session.email.split('@')[0];
-      await loadTodayPlan(session.email);
-      state.screen = 'home';
+    if(!DEMO_MODE){
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data:{ session } } = await supabase.auth.getSession();
+      if(session && session.user){
+        await afterAuthSuccess(session.user);
+      }
+    } else {
+      const session = await getJson('ansahni:session', null);
+      if(session && session.email){
+        const accounts = await getJson('ansahni:accounts', {});
+        const acc = accounts[session.email];
+        state.email = session.email;
+        state.userName = (acc && acc.fullName) || session.email.split('@')[0];
+        await loadTodayPlan(session.email);
+        state.screen = 'home';
+      }
     }
-  }catch(e){ console.error(e); }
+  }catch(e){ console.error('Erreur d\'initialisation:', e); }
   render();
 })();
 </script>
