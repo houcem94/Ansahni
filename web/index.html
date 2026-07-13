@@ -412,7 +412,8 @@ let state = {
 
 function setState(patch){ state = {...state, ...patch}; render(); }
 function setCbt(patch){ state.cbt = {...state.cbt, ...patch}; render(); }
-function go(screen){ setState({screen}); }
+function stopSpeech(){ if('speechSynthesis' in window) window.speechSynthesis.cancel(); }
+function go(screen){ stopSpeech(); setState({screen}); }
 
 /* ---------- ICONS ---------- */
 const ic = {
@@ -439,6 +440,24 @@ const ic = {
 const COMPANION_NAME = 'أنيس';
 let speakRegistry = {}; let speakCounter = 0;
 function registerSpeak(text){ const id='sp'+(speakCounter++); speakRegistry[id]=text; return id; }
+let cachedVoice = null;
+function pickPreferredVoice(){
+  if(!('speechSynthesis' in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if(!voices || voices.length===0) return null;
+  const arabicVoices = voices.filter(v=> v.lang && v.lang.toLowerCase().startsWith('ar'));
+  if(arabicVoices.length===0) return null;
+  const maleNamed = arabicVoices.find(v=> /male/i.test(v.name) && !/female/i.test(v.name));
+  if(maleNamed) return maleNamed;
+  const knownMale = arabicVoices.find(v=> /naayf|hamed|majed|khalid|tarik|فارس|أحمد/i.test(v.name));
+  if(knownMale) return knownMale;
+  const notFemale = arabicVoices.find(v=> !/female|zariyah|salma|laila|hoda/i.test(v.name));
+  return notFemale || arabicVoices[0];
+}
+if('speechSynthesis' in window){
+  window.speechSynthesis.onvoiceschanged = () => { cachedVoice = pickPreferredVoice(); };
+  cachedVoice = pickPreferredVoice();
+}
 function speakText(text){
   try{
     if(!('speechSynthesis' in window)){
@@ -448,7 +467,9 @@ function speakText(text){
     if(!text) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ar-SA'; u.rate = 0.95; u.pitch = 1;
+    u.lang = 'ar-SA'; u.rate = 1.02; u.pitch = 0.85;
+    if(!cachedVoice) cachedVoice = pickPreferredVoice();
+    if(cachedVoice) u.voice = cachedVoice;
     u.onerror = (e)=>{ console.error('speechSynthesis error:', e); };
     window.speechSynthesis.speak(u);
   }catch(e){ console.error(e); alert('تعذّرت القراءة الصوتية في هذه البيئة.'); }
@@ -679,7 +700,10 @@ function screenMonthlyPlan(){
       const g = mp.goals.find(x=>x.category===c.key) || {text:''};
       return `<div style="margin-bottom:${i<MONTHLY_CATEGORIES.length-1?'16px':'0'};">
         <label style="font-weight:700; font-size:13.5px; display:block; margin-bottom:6px;">${c.emoji} ${c.label}</label>
-        <input class="field" id="goal-${c.key}" placeholder="اكتب هدفك لهذا الشهر..." value="${g.text||''}" />
+        <div class="row">
+          <input class="field" id="goal-${c.key}" placeholder="اكتب هدفك لهذا الشهر..." value="${g.text||''}" style="flex:1;" />
+          <button class="icon-btn" style="width:40px; height:40px; flex-shrink:0;" title="مسح" onclick="clearMonthlyGoal('${c.key}')">✕</button>
+        </div>
       </div>`;
     }).join('')}
   </div>
@@ -778,7 +802,7 @@ function onboardingNext(){
 async function finishOnboarding(){
   if(!DEMO_MODE && supabase && currentUserId){ await dbUpdateProfile(currentUserId, {onboarded:true}); }
   else{ await setJson(`ansahni:onboarded:${state.email}`, true); }
-  setState({screen:'home', onboardingIndex:0});
+  stopSpeech(); setState({screen:'home', onboardingIndex:0});
 }
 
 function topbar(title, onBack, onLogout){
@@ -853,7 +877,7 @@ function screenHome(){
   <div class="topbar">
     <span></span>
     <div>
-      <div class="eyebrow">${new Date().toLocaleDateString('ar-EG',{weekday:'long', day:'numeric', month:'long'})}</div>
+      <div class="eyebrow">${new Date().toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'})}</div>
       <h2 style="font-size:19px;">مرحبًا${state.userName? ' يا '+state.userName:''} 👋</h2>
     </div>
     <span style="width:36px;"></span>
@@ -989,10 +1013,24 @@ function screenMorningPlanning(){
   </div>
   <div class="card">
     ${tasks.length===0? `<p class="muted" style="font-size:13.5px;">لا توجد مهام بعد.</p>` :
-      tasks.map((t,i)=>`<div class="task-item"><div class="checkbox ${t.done?'done':''}" onclick="toggleTask(${i})">${t.done?ic.check:''}</div>
-      <span style="${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}">${t.title}</span></div>`).join('')}
+      tasks.map((t,i)=>`<div class="task-item" style="gap:8px;">
+        <div class="checkbox ${t.done?'done':''}" onclick="toggleTask(${i})">${t.done?ic.check:''}</div>
+        <input class="field" style="flex:1; padding:8px 10px; font-size:14px; ${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}"
+          value="${t.title}" onchange="renameTask(${i}, this.value)" />
+        <button class="icon-btn" style="width:32px; height:32px; flex-shrink:0;" title="حذف" onclick="deleteTask(${i})">✕</button>
+      </div>`).join('')}
   </div>
   <button class="btn" onclick="go('home')">حفظ المخطط والعودة</button>`;
+}
+function renameTask(i, value){
+  const val = value.trim();
+  if(!val) return;
+  state.plan.tasks[i].title = val;
+  patchPlan({tasks: state.plan.tasks});
+}
+function deleteTask(i){
+  state.plan.tasks.splice(i,1);
+  patchPlan({tasks: state.plan.tasks});
 }
 const ACTIVITIES = [
   {key:'breathing', title:'تمرين تنفس', icon:ic.spa},
@@ -1120,6 +1158,7 @@ async function nextWithReflection(promptContext, fallbackText){
 }
 async function cbtContinue(){
   if(state.cbt.reflectionLoading) return;
+  stopSpeech();
   if(state.cbt.step < CBT_TOTAL_STEPS-1){
     setCbt({showReflection:false, step: state.cbt.step+1});
   } else {
@@ -1405,7 +1444,15 @@ function screenBreathing(){
   <div style="text-align:center; padding-top:20px;">
     <div class="breath-circle" style="width:${size}px; height:${size}px;"><span class="breath-num">${breath.seconds}</span></div>
     <p style="margin-top:26px; font-size:16px;">${BREATH_LABELS[breath.phase]}</p>
-    <p class="muted" style="margin-top:6px; font-size:13px;">الدورات المتبقية: ${breath.cycles}</p></div>`;
+    <p class="muted" style="margin-top:6px; font-size:13px;">الدورات المتبقية: ${breath.cycles}</p>
+  </div>
+  <button class="link-btn" style="display:block; text-align:center; width:100%; margin-top:26px;" onclick="stopBreathingEarly()">إيقاف التمرين والعودة لاحقًا</button>`;
+}
+function stopBreathingEarly(){
+  clearInterval(breathPhaseTimer);
+  breathPhaseTimer = null;
+  breath = {phase:'inhale', seconds:3, cycles:4};
+  go('home');
 }
 
 /* ---- Note du jour /100 + note IA personnalisée ---- */
@@ -1547,6 +1594,10 @@ function saveMonthlyGoals(){
   });
   saveMonthlyPlan({goals});
 }
+function clearMonthlyGoal(catKey){
+  const goals = state.monthlyPlan.goals.map(g=> g.category===catKey ? {...g, text:'', rating:null} : g);
+  saveMonthlyPlan({goals});
+}
 function setGoalRating(cat, rating){
   const goals = state.monthlyPlan.goals.map(g=> g.category===cat ? {...g, rating} : g);
   saveMonthlyPlan({goals});
@@ -1633,7 +1684,7 @@ async function doEnterDemo(){
   await setJson('ansahni:session', {email});
   await loadTodayPlan(email);
   const onboarded = await getJson(`ansahni:onboarded:${email}`, false);
-  setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
+  stopSpeech(); setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
 }
 async function previewAuthEnter(email, name){
   const accounts = await getJson('ansahni:accounts', {});
@@ -1644,7 +1695,7 @@ async function previewAuthEnter(email, name){
   await setJson('ansahni:session', {email});
   await loadTodayPlan(email);
   const onboarded = await getJson(`ansahni:onboarded:${email}`, false);
-  setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:'', previewRealAuth:false});
+  stopSpeech(); setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:'', previewRealAuth:false});
 }
 async function doLogin(){
   const email = document.getElementById('email').value.trim();
@@ -1679,7 +1730,7 @@ async function afterAuthSuccess(user){
   state.autoSpeak = profile ? profile.auto_speak : true;
   await loadTodayPlan(user.email);
   const onboarded = profile ? profile.onboarded : false;
-  setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
+  stopSpeech(); setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:''});
 }
 async function doLogout(){
   if(DEMO_MODE){
@@ -1690,7 +1741,7 @@ async function doLogout(){
   }
   state.email=''; state.userName='';
   state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
-  setState({screen:'login'});
+  stopSpeech(); setState({screen:'login'});
 }
 
 /* ============================================================
