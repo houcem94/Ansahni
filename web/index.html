@@ -191,8 +191,8 @@ async function setJson(key, value){ await store.set(key, JSON.stringify(value));
 /* ---- Supabase (mode réel) : renseignez ces deux valeurs pour activer un vrai
    compte + une vraie base de données. Tant qu'elles ne sont pas renseignées,
    l'app reste en "mode démo" (cache local uniquement, tel qu'actuellement). ---- */
-const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+const SUPABASE_URL = 'https://phetkoumblizndtonzik.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoZXRrb3VtYmxpem5kdG9uemlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODczNDksImV4cCI6MjA5OTI2MzM0OX0.eA3fYxRE3TqaY7CqoyCm25WcmRFki8M_4XBKya22z4U';
 const DEMO_MODE = SUPABASE_URL.includes('YOUR-PROJECT');
 let supabase = null;
 let currentUserId = null;
@@ -217,10 +217,43 @@ async function dbUpdatePlan(planId, fields){
   try{ await supabase.from('daily_plans').update(fields).eq('id', planId); }catch(e){ console.error(e); }
 }
 async function dbLoadScoreHistory(userId){
-  const { data, error } = await supabase.from('daily_plans').select('plan_date, day_score, day_note')
+  const { data, error } = await supabase.from('daily_plans').select('plan_date, day_score, day_note, main_emotion')
     .eq('user_id', userId).not('day_score','is',null).order('plan_date', { ascending:true });
   if(error){ console.error(error); return []; }
-  return (data||[]).map(r=>({ date:r.plan_date, score:r.day_score, note:r.day_note }));
+  return (data||[]).map(r=>({ date:r.plan_date, score:r.day_score, note:r.day_note, emotion:r.main_emotion }));
+}
+/* ---- Séances TCC complètes (تقييم الأفكار التلقائية) ---- */
+async function dbCreateCbtSession(userId, dailyPlanId){
+  const { data, error } = await supabase.from('cbt_sessions').insert({ user_id:userId, daily_plan_id:dailyPlanId }).select().single();
+  if(error){ console.error(error); return null; }
+  return data.id;
+}
+async function dbUpdateCbtSession(sessionId, fields){
+  try{ await supabase.from('cbt_sessions').update(fields).eq('id', sessionId); }catch(e){ console.error(e); }
+}
+function cbtToDbFields(c){
+  return {
+    automatic_thought:c.automaticThought, belief_before:c.beliefBefore, emotion:c.emotion, emotion_intensity:c.emotionIntensity,
+    evidence_for:c.evidenceFor, evidence_against:c.evidenceAgainst, helps_now:c.helpsNow, harms_now:c.harmsNow,
+    thinking_errors:c.thinkingErrors, new_thought_user:c.newThoughtUser, belief_after:c.beliefAfter, belief_old_after:c.beliefOldAfter
+  };
+}
+/* ---- Planning mensuel ---- */
+async function dbLoadOrCreateMonthlyPlan(userId, mKey){
+  const { data: existing } = await supabase.from('monthly_plans').select().eq('user_id', userId).eq('month_key', mKey).maybeSingle();
+  if(existing) return existing;
+  const { data: inserted, error } = await supabase.from('monthly_plans').insert({ user_id:userId, month_key:mKey, goals: MONTHLY_CATEGORIES.map(c=>({category:c.key, text:'', rating:null})) }).select().single();
+  if(error){ console.error(error); return null; }
+  return inserted;
+}
+async function dbUpdateMonthlyPlan(planId, fields){
+  try{ await supabase.from('monthly_plans').update(fields).eq('id', planId); }catch(e){ console.error(e); }
+}
+function monthlyPlanToDbFields(mp){
+  return { goals: mp.goals, review_comment: mp.reviewComment || null, ai_review: mp.aiReview || null };
+}
+function mapDbMonthlyPlanToState(row){
+  return { id: row.id, goals: row.goals || [], reviewComment: row.review_comment || '', aiReview: row.ai_review || null };
 }
 function planToDbFields(plan){
   return {
@@ -228,7 +261,8 @@ function planToDbFields(plan){
     lunch_activity_done: plan.lunchDone, lunch_activity_type: plan.lunchType,
     evening_adhkar_done: plan.eveningAdhkarDone, breathing_exercise_done: plan.breathingDone,
     day_rating: plan.dayRating || null, day_review_notes: plan.dayNotes || null,
-    day_score: plan.score, day_note: plan.dailyNote, points_awarded: plan.pointsAwarded
+    day_score: plan.score, day_note: plan.dailyNote, points_awarded: plan.pointsAwarded,
+    main_emotion: plan.mainEmotion || null
   };
 }
 function mapDbPlanToState(row){
@@ -237,7 +271,8 @@ function mapDbPlanToState(row){
     lunchDone: row.lunch_activity_done, lunchType: row.lunch_activity_type,
     eveningAdhkarDone: row.evening_adhkar_done, breathingDone: row.breathing_exercise_done,
     dayRating: row.day_rating || 0, dayNotes: row.day_review_notes || '',
-    score: row.day_score, dailyNote: row.day_note, pointsAwarded: row.points_awarded || false
+    score: row.day_score, dailyNote: row.day_note, pointsAwarded: row.points_awarded || false,
+    mainEmotion: row.main_emotion || null
   };
 }
 
@@ -366,12 +401,13 @@ const ONBOARDING_SLIDES = [
 
 let state = {
   screen:'login', authError:'', email:'',
-  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false },
+  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null },
   cbt:{ step:0, showReflection:false, reflectionText:'', reflectionLoading:false,
     automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50, evidenceFor:'', evidenceAgainst:'',
     helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 },
   aiReport:null, aiLoading:false, aiError:'',
-  scoreHistory:[], autoSpeak:true
+  scoreHistory:[], autoSpeak:true,
+  monthlyPlan:{ goals:[], reviewComment:'', aiReview:null }
 };
 
 function setState(patch){ state = {...state, ...patch}; render(); }
@@ -631,6 +667,52 @@ function screenVideoDetail(){
   <p class="muted" style="font-size:12px; text-align:center; margin-top:6px;">قد لا يعمل التشغيل داخل هذه المعاينة المدمجة — سيعمل بشكل طبيعي بعد نشر التطبيق.</p>
   <button class="btn" style="margin-top:14px;" onclick="${back}">رجوع</button>`;
 }
+function screenMonthlyPlan(){
+  const mp = state.monthlyPlan;
+  const monthLabel = new Date().toLocaleDateString('ar-EG',{month:'long', year:'numeric'});
+  const hasGoals = mp.goals.some(g=>g.text);
+  return `
+  ${topbar('خطة الشهر', "go('home')")}
+  <p class="muted" style="margin-bottom:14px; font-size:13.5px;">${monthLabel} — حدد هدفًا واحدًا لكل جانب من جوانب حياتك هذا الشهر</p>
+  <div class="card">
+    ${MONTHLY_CATEGORIES.map((c,i)=>{
+      const g = mp.goals.find(x=>x.category===c.key) || {text:''};
+      return `<div style="margin-bottom:${i<MONTHLY_CATEGORIES.length-1?'16px':'0'};">
+        <label style="font-weight:700; font-size:13.5px; display:block; margin-bottom:6px;">${c.emoji} ${c.label}</label>
+        <input class="field" id="goal-${c.key}" placeholder="اكتب هدفك لهذا الشهر..." value="${g.text||''}" />
+      </div>`;
+    }).join('')}
+  </div>
+  <button class="btn" style="margin-top:14px;" onclick="saveMonthlyGoals()">حفظ الأهداف</button>
+  ${hasGoals ? `<button class="btn secondary" style="margin-top:10px;" onclick="go('monthly_review')">📝 تقييم هذا الشهر</button>` : ''}
+  ${mp.aiReview ? companionSpeech(mp.aiReview, 40) : ''}`;
+}
+function screenMonthlyReview(){
+  const mp = state.monthlyPlan;
+  if(state.monthlyReviewLoading){
+    return `${topbar('تقييم الشهر', "go('monthly_plan')")}
+    <div style="text-align:center; padding-top:60px;"><div class="spinner"></div><p class="muted" style="margin-top:16px;">${COMPANION_NAME} يراجع شهرك الآن...</p></div>`;
+  }
+  const activeGoals = MONTHLY_CATEGORIES.filter(c => (mp.goals.find(g=>g.category===c.key)||{}).text);
+  if(activeGoals.length===0){
+    return `${topbar('تقييم الشهر', "go('monthly_plan')")}<p class="muted" style="text-align:center; margin-top:30px;">لم تحدد أي أهداف بعد لهذا الشهر.</p>`;
+  }
+  return `${topbar('تقييم الشهر', "go('monthly_plan')")}
+  <div class="card">
+    ${activeGoals.map(c=>{
+      const g = mp.goals.find(x=>x.category===c.key);
+      return `<div style="margin-bottom:18px;">
+        <div style="font-weight:700; font-size:13.5px; margin-bottom:8px;">${c.emoji} ${c.label}: <span class="muted" style="font-weight:400;">${g.text}</span></div>
+        <div class="row">
+          ${['-','+','++'].map(r=>`<button class="yn-btn ${g.rating===r?'selected':''}" style="flex:1;" onclick="setGoalRating('${c.key}','${r}')">${r}</button>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+  <p style="font-weight:700; font-size:13.5px; margin:14px 0 8px;">تعليق عام عن شهرك (اختياري)</p>
+  <textarea class="field" id="monthComment" rows="3" placeholder="كيف كان شهرك بشكل عام؟...">${mp.reviewComment||''}</textarea>
+  <button class="btn" style="margin-top:14px;" onclick="submitMonthlyReview()">إرسال للتقييم</button>`;
+}
 function screenLibrary(){
   return `
   ${topbar('مكتبة النصائح', "go('home')")}
@@ -806,16 +888,11 @@ function screenHome(){
     <div class="check" style="color:${(p.eveningAdhkarDone&&p.breathingDone)?'var(--sage)':'#CFC8B4'};">${(p.eveningAdhkarDone&&p.breathingDone)?ic.check:ic.arrow}</div>
   </div>
 
-  <div style="font-weight:800; font-size:14.5px; margin:22px 0 10px;">أنشطة أخرى</div>
-  ${tipOfDayCard()}
-  <div class="moment-card card" onclick="go('library')">
-    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${ic.book}</div>
-    <div><div class="moment-title">مكتبة النصائح</div><div class="moment-sub">بطاقات عملية لكل شعور تمر به</div></div>
-    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
-  </div>
-  <div class="moment-card card" onclick="go('video_library')">
-    <div class="moment-icon" style="background:var(--dusk-light); color:var(--dusk);">▶️</div>
-    <div><div class="moment-title">نصائح د. فتحي بالفيديو</div><div class="moment-sub">${DR_VIDEOS.length? 'فيديوهات قصيرة تناسب حالتك':'قريبًا'}</div></div>
+  ${dailyTipCard()}
+  <div style="font-weight:800; font-size:14.5px; margin:22px 0 10px;">📅 خطة الشهر</div>
+  <div class="moment-card card" onclick="openMonthlyPlan()">
+    <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">📅</div>
+    <div><div class="moment-title">أهداف هذا الشهر</div><div class="moment-sub">حدد أهدافك، وقيّم تقدّمك في نهاية الشهر</div></div>
     <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
   </div>
   <p class="muted" style="text-align:center; font-size:11.5px; margin-top:22px; line-height:1.8;">
@@ -836,12 +913,20 @@ function tasksReminderCard(){
   </div>`;
 }
 function toggleHomeTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
-function tipOfDayCard(){
+function dailyTipCard(){
   const t = pickTipOfDay();
-  return `<div class="moment-card card" onclick="openTip('${t.id}','home')">
-    <div class="moment-icon" style="background:var(--amber-light); color:var(--amber);">${ic.spark}</div>
-    <div><div class="moment-title">نصيحة اليوم: ${t.title}</div><div class="moment-sub">اضغط للاطلاع على خطوات عملية</div></div>
-    <div class="check" style="color:#CFC8B4;">${ic.arrow}</div>
+  return `<div class="card">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+      ${companionAvatar(30)}
+      <div style="font-weight:700; font-size:14px;">نصيحة اليوم: ${t.title}</div>
+    </div>
+    <div style="font-size:13.5px; line-height:1.8; margin-bottom:12px;">
+      ${t.steps.map((s,i)=>`<div style="margin-bottom:6px;"><b>${i+1}.</b> ${s}</div>`).join('')}
+    </div>
+    <div class="bubble" style="margin-bottom:10px;">
+      <span></span><span style="font-family:'Amiri'; font-size:15.5px;">${t.dhikr}</span>
+    </div>
+    <p style="text-align:center; font-size:12.5px; font-weight:600; color:var(--sage-dark);">${t.maxim}</p>
   </div>`;
 }
 
@@ -1203,6 +1288,15 @@ async function runAiReport(){
     const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
     setState({aiLoading:false, aiReport:parsed});
     if(state.autoSpeak && parsed.summary) speakText(parsed.summary);
+    await patchPlan({mainEmotion: c.emotion});
+    if(!DEMO_MODE && supabase && state.cbt.id){
+      await dbUpdateCbtSession(state.cbt.id, {
+        ...cbtToDbFields(c),
+        new_thought_ai: parsed.new_thought_ai, ai_summary: parsed.summary, ai_encouragement: parsed.encouragement,
+        ai_acceptance_note: parsed.acceptance_note, ai_professional_referral: parsed.professional_referral || false,
+        ai_referral_reason: parsed.referral_reason || null, status:'completed', completed_at: new Date().toISOString()
+      });
+    }
   }catch(err){ console.error(err); setState({aiLoading:false, aiError:'تعذّر الاتصال بالمساعد الذكي حاليًا. حاول لاحقًا.'}); }
 }
 function screenCbtReport(){
@@ -1327,14 +1421,21 @@ function computeDayScore(plan, cbtCompleted){
   score += plan.dayRating ? Math.round((plan.dayRating/5)*15) : 0;
   return Math.min(100, score);
 }
-const NOTE_SYSTEM_PROMPT = `أنت مدرّب داعم ضمن تطبيق "انصحني". بناءً على ملخص يوم المستخدم ودرجته من 100، اكتب ملاحظة قصيرة (3-5 جمل) بالعربية:
-تقدّر ما أنجزه، وتذكر بلطف نقطة يمكن تحسينها غدًا، وتنهي بجملة تحفيزية. لا تقدّم تشخيصًا طبيًا أو نفسيًا. لا تستخدم رموزًا مثل JSON، اكتب نصًا عاديًا فقط.`;
+const NOTE_SYSTEM_PROMPT = `أنت ${COMPANION_NAME}، مدرّب داعم ضمن تطبيق "انصحني". بناءً على ملخص يوم المستخدم ودرجته من 100، وسجل أدائه في الأيام السابقة إن توفر، اكتب ملاحظة (4-6 جمل) بالعربية:
+تقدّر ما أنجزه اليوم، ثم قارن بلطف مع نمط الأيام السابقة إن وُجد سجل (تحسّن، تراجع، أو ثبات، أو تكرار شعور معين) وعلّق على ذلك تحديدًا كمتابعة شخصية حقيقية له، ثم اقترح نقطة صغيرة للغد، وانهِ بجملة تحفيزية دافئة. إن لم يتوفر سجل سابق، اكتفِ بالتعليق على يومه فقط دون اختلاق مقارنة. لا تقدّم تشخيصًا طبيًا أو نفسيًا. اكتب نصًا عاديًا فقط دون JSON.`;
+function buildHistoryContext(){
+  const recent = [...state.scoreHistory].filter(h=>h.date!==todayStr()).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  if(recent.length===0) return 'لا يوجد سجل أيام سابقة بعد (هذا أول يوم يُسجَّل).';
+  return recent.map(h=>`${h.date}: نقطة ${h.score}/100${h.emotion? '، الشعور الأساسي: '+h.emotion : ''}`).join('\n');
+}
 async function generateDailyNote(plan, score){
-  const summary = `أنجز المستخدم اليوم: أذكار الصباح: ${plan.morningDone?'نعم':'لا'}. المهام المنجزة: ${plan.tasks.filter(t=>t.done).length}/${plan.tasks.length}. نشاط الظهيرة: ${plan.lunchDone?'نعم':'لا'}. تمرين إعادة صياغة الأفكار: مكتمل. أذكار المساء: ${plan.eveningAdhkarDone?'نعم':'لا'}. تمرين التنفس: مكتمل. تقييمه الذاتي ليومه: ${plan.dayRating||'غير محدد'}/5. النقطة الإجمالية: ${score}/100.`;
+  const summary = `أنجز المستخدم اليوم: أذكار الصباح: ${plan.morningDone?'نعم':'لا'}. المهام المنجزة: ${plan.tasks.filter(t=>t.done).length}/${plan.tasks.length}. نشاط الظهيرة: ${plan.lunchDone?'نعم':'لا'}. تمرين إعادة صياغة الأفكار: مكتمل${plan.mainEmotion? ' (الشعور الأساسي اليوم: '+plan.mainEmotion+')':''}. أذكار المساء: ${plan.eveningAdhkarDone?'نعم':'لا'}. تمرين التنفس: مكتمل. تقييمه الذاتي ليومه: ${plan.dayRating||'غير محدد'}/5. النقطة الإجمالية: ${score}/100.
+سجل الأيام السابقة (الأحدث أولًا):
+${buildHistoryContext()}`;
   try{
     const res = await fetch("/.netlify/functions/ai-proxy", {
       method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ max_tokens:260, system:NOTE_SYSTEM_PROMPT, messages:[{role:"user", content:summary}] })
+      body: JSON.stringify({ max_tokens:400, system:NOTE_SYSTEM_PROMPT, messages:[{role:"user", content:summary}] })
     });
     const data = await res.json();
     const text = (data.content||[]).map(b=>b.text||'').join('').trim();
@@ -1357,7 +1458,7 @@ async function onDayFinished(){
   await patchPlan({dailyNote:note});
   if(state.autoSpeak) speakText(note);
   const history = state.scoreHistory.filter(h=>h.date!==todayStr());
-  history.push({date: todayStr(), score, note});
+  history.push({date: todayStr(), score, note, emotion: state.plan.mainEmotion || null});
   state.scoreHistory = history;
   if(DEMO_MODE || !supabase){ await setJson(`ansahni:scores:${state.email}`, history); }
   if(!state.plan.pointsAwarded){
@@ -1405,16 +1506,89 @@ function launchConfetti(){
 /* ============================================================
    PERSISTANCE (plan du jour + historique des notes)
    ============================================================ */
+/* ============================================================
+   خطة الشهر (planning mensuel)
+   ============================================================ */
+const MONTHLY_CATEGORIES = [
+  { key:'health', label:'الصحة', emoji:'💪' },
+  { key:'work', label:'العمل', emoji:'💼' },
+  { key:'religious', label:'الجانب الروحي', emoji:'🕌' },
+  { key:'family', label:'العائلة', emoji:'❤️' },
+  { key:'social', label:'علاقات أخرى', emoji:'🤝' },
+];
+function monthKey(){ return new Date().toISOString().substring(0,7); }
+function monthlyPlanKey(email){ return `ansahni:monthlyplan:${email}:${monthKey()}`; }
+async function loadMonthlyPlan(){
+  if(!DEMO_MODE && supabase && currentUserId){
+    const row = await dbLoadOrCreateMonthlyPlan(currentUserId, monthKey());
+    state.monthlyPlan = row ? mapDbMonthlyPlanToState(row) : { goals: MONTHLY_CATEGORIES.map(c=>({category:c.key, text:'', rating:null})), reviewComment:'', aiReview:null };
+    return;
+  }
+  const saved = await getJson(monthlyPlanKey(state.email), null);
+  state.monthlyPlan = saved || { goals: MONTHLY_CATEGORIES.map(c=>({category:c.key, text:'', rating:null})), reviewComment:'', aiReview:null };
+}
+async function saveMonthlyPlan(patch){
+  state.monthlyPlan = {...state.monthlyPlan, ...patch};
+  render();
+  if(!DEMO_MODE && supabase && state.monthlyPlan.id){
+    await dbUpdateMonthlyPlan(state.monthlyPlan.id, monthlyPlanToDbFields(state.monthlyPlan));
+    return;
+  }
+  await setJson(monthlyPlanKey(state.email), state.monthlyPlan);
+}
+async function openMonthlyPlan(){
+  await loadMonthlyPlan();
+  go('monthly_plan');
+}
+function saveMonthlyGoals(){
+  const goals = MONTHLY_CATEGORIES.map(c=>{
+    const prev = state.monthlyPlan.goals.find(g=>g.category===c.key) || {};
+    return { category:c.key, text: document.getElementById('goal-'+c.key).value.trim(), rating: prev.rating || null };
+  });
+  saveMonthlyPlan({goals});
+}
+function setGoalRating(cat, rating){
+  const goals = state.monthlyPlan.goals.map(g=> g.category===cat ? {...g, rating} : g);
+  saveMonthlyPlan({goals});
+}
+const MONTHLY_SYSTEM_PROMPT = `أنت ${COMPANION_NAME}، مرافق داعم ضمن تطبيق "انصحني". بناءً على أهداف المستخدم لهذا الشهر في جوانب مختلفة من حياته، وتقييمه الذاتي لكل هدف (- تعني لم يتحقق، + تعني تحقق بشكل جيد، ++ تعني تحقق بامتياز)، وتعليقه العام على شهره، اكتب رأيًا داعمًا ومفيدًا (5-7 جمل):
+قدّر ما تحقق فعلًا مهما كان صغيرًا، وتناول بلطف الأهداف التي لم تتحقق دون لوم، واقترح نصيحة عملية واحدة أو خطوة بسيطة للشهر القادم بناءً على النمط الذي تلاحظه. لا تقدّم تشخيصًا طبيًا أو نفسيًا. اكتب نصًا عاديًا فقط دون JSON.`;
+async function generateMonthlyReview(mp){
+  const summary = mp.goals.filter(g=>g.text).map(g=>{
+    const cat = MONTHLY_CATEGORIES.find(c=>c.key===g.category);
+    return `${cat.label}: الهدف "${g.text}" — التقييم: ${g.rating||'غير مقيَّم'}`;
+  }).join('\n');
+  const userMsg = `${summary}\n\nتعليق المستخدم العام على شهره: ${mp.reviewComment || 'لا يوجد'}`;
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:500, system:MONTHLY_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
+    });
+    const data = await res.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
+    return text || 'أحسنت على مراجعتك لشهرك — هذه خطوة مهمة بحد ذاتها. استمر في تحديد أهدافك شهريًا.';
+  }catch(e){ console.error(e); return 'تعذّر الاتصال بالمساعد الذكي حاليًا، لكن مجرد مراجعتك لشهرك بهذا الشكل يستحق التقدير.'; }
+}
+async function submitMonthlyReview(){
+  const comment = document.getElementById('monthComment').value.trim();
+  await saveMonthlyPlan({reviewComment:comment});
+  setState({monthlyReviewLoading:true});
+  const review = await generateMonthlyReview(state.monthlyPlan);
+  await saveMonthlyPlan({aiReview:review});
+  setState({monthlyReviewLoading:false, screen:'monthly_plan'});
+  if(state.autoSpeak) speakText(review);
+}
+
 function planKey(email){ return `ansahni:plan:${email}:${todayStr()}`; }
 async function loadTodayPlan(email){
   if(!DEMO_MODE && supabase && currentUserId){
     const row = await dbLoadOrCreatePlan(currentUserId, todayStr());
-    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
+    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
     state.scoreHistory = await dbLoadScoreHistory(currentUserId);
     return;
   }
   const saved = await getJson(planKey(email), null);
-  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
+  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
   state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
   state.points = await getJson(`ansahni:points:${email}`, 0);
   state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, true);
@@ -1437,9 +1611,12 @@ function addTask(){
 function toggleTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
 
 async function startEveningFlow(){
-  state.cbt = { step:0, showReflection:false, reflectionText:'', reflectionLoading:false, automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50,
+  state.cbt = { id:null, step:0, showReflection:false, reflectionText:'', reflectionLoading:false, automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50,
     evidenceFor:'', evidenceAgainst:'', helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 };
   state.aiReport = null; state.aiError='';
+  if(!DEMO_MODE && supabase && currentUserId && state.plan.id){
+    state.cbt.id = await dbCreateCbtSession(currentUserId, state.plan.id);
+  }
   go('cbt');
 }
 
@@ -1512,7 +1689,7 @@ async function doLogout(){
     currentUserId = null;
   }
   state.email=''; state.userName='';
-  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false };
+  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
   setState({screen:'login'});
 }
 
@@ -1542,6 +1719,8 @@ function render(){
     case 'evening_adhkar': html = screenEveningAdhkar(); break;
     case 'day_eval': html = screenDayEval(); break;
     case 'breathing': html = screenBreathing(); break;
+    case 'monthly_plan': html = screenMonthlyPlan(); break;
+    case 'monthly_review': html = screenMonthlyReview(); break;
     case 'library': html = screenLibrary(); break;
     case 'tip_detail': html = screenTipDetail(); break;
     case 'video_library': html = screenVideoLibrary(); break;
