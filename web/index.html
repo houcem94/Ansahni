@@ -248,7 +248,7 @@ function cbtToDbFields(c){
 async function dbLoadOrCreateMonthlyPlan(userId, mKey){
   const { data: existing } = await supabase.from('monthly_plans').select().eq('user_id', userId).eq('month_key', mKey).maybeSingle();
   if(existing) return existing;
-  const { data: inserted, error } = await supabase.from('monthly_plans').insert({ user_id:userId, month_key:mKey, goals: MONTHLY_CATEGORIES.map(c=>({category:c.key, text:'', rating:null})) }).select().single();
+  const { data: inserted, error } = await supabase.from('monthly_plans').insert({ user_id:userId, month_key:mKey, goals: [] }).select().single();
   if(error){ console.error(error); return null; }
   return inserted;
 }
@@ -266,6 +266,7 @@ function planToDbFields(plan){
     morning_adhkar_done: plan.morningDone, tasks: plan.tasks,
     lunch_activity_done: plan.lunchDone, lunch_activity_type: plan.lunchType,
     evening_adhkar_done: plan.eveningAdhkarDone, breathing_exercise_done: plan.breathingDone,
+    breathing_skipped: plan.breathingSkipped || false,
     day_rating: plan.dayRating || null, day_review_notes: plan.dayNotes || null,
     day_score: plan.score, day_note: plan.dailyNote, points_awarded: plan.pointsAwarded,
     main_emotion: plan.mainEmotion || null
@@ -276,6 +277,7 @@ function mapDbPlanToState(row){
     id: row.id, morningDone: row.morning_adhkar_done, tasks: row.tasks || [],
     lunchDone: row.lunch_activity_done, lunchType: row.lunch_activity_type,
     eveningAdhkarDone: row.evening_adhkar_done, breathingDone: row.breathing_exercise_done,
+    breathingSkipped: row.breathing_skipped || false,
     dayRating: row.day_rating || 0, dayNotes: row.day_review_notes || '',
     score: row.day_score, dailyNote: row.day_note, pointsAwarded: row.points_awarded || false,
     mainEmotion: row.main_emotion || null
@@ -407,7 +409,7 @@ const ONBOARDING_SLIDES = [
 
 let state = {
   screen:'login', authError:'', email:'',
-  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null },
+  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false },
   cbt:{ step:0, showReflection:false, reflectionText:'', reflectionLoading:false,
     automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50, evidenceFor:'', evidenceAgainst:'',
     helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 },
@@ -700,21 +702,22 @@ function screenMonthlyPlan(){
   const hasGoals = mp.goals.some(g=>g.text);
   return `
   ${topbar('خطة الشهر', "go('home')")}
-  <p class="muted" style="margin-bottom:14px; font-size:13.5px;">${monthLabel} — حدد هدفًا واحدًا لكل جانب من جوانب حياتك هذا الشهر</p>
-  <div class="card">
-    ${MONTHLY_CATEGORIES.map((c,i)=>{
-      const g = mp.goals.find(x=>x.category===c.key) || {text:''};
-      return `<div style="margin-bottom:${i<MONTHLY_CATEGORIES.length-1?'16px':'0'};">
-        <label style="font-weight:700; font-size:13.5px; display:block; margin-bottom:6px;">${c.emoji} ${c.label}</label>
-        <div class="row">
-          <input class="field" id="goal-${c.key}" placeholder="اكتب هدفك لهذا الشهر..." value="${g.text||''}" style="flex:1;" />
-          <button class="icon-btn" style="width:40px; height:40px; flex-shrink:0;" title="مسح" onclick="clearMonthlyGoal('${c.key}')">✕</button>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>
-  <button class="btn" style="margin-top:14px;" onclick="saveMonthlyGoals()">حفظ الأهداف</button>
-  ${hasGoals ? `<button class="btn secondary" style="margin-top:10px;" onclick="go('monthly_review')">📝 تقييم هذا الشهر</button>` : ''}
+  <p class="muted" style="margin-bottom:14px; font-size:13.5px;">${monthLabel} — أضف هدفًا أو أكثر لكل جانب من جوانب حياتك هذا الشهر</p>
+  ${MONTHLY_CATEGORIES.map(c=>{
+    const goalsInCat = mp.goals.filter(g=>g.category===c.key);
+    return `<div class="card">
+      <label style="font-weight:700; font-size:13.5px; display:block; margin-bottom:10px;">${c.emoji} ${c.label}</label>
+      ${goalsInCat.map(g=>`<div class="row" style="margin-bottom:8px;">
+        <input class="field" style="flex:1;" value="${g.text}" oninput="renameMonthlyGoalSilent('${g.id}', this.value)" onchange="renameMonthlyGoal('${g.id}', this.value)" />
+        <button class="icon-btn" style="width:40px; height:40px; flex-shrink:0;" title="حذف" onclick="deleteMonthlyGoal('${g.id}')">✕</button>
+      </div>`).join('')}
+      <div class="row">
+        <input class="field" id="newgoal-${c.key}" placeholder="أضف هدفًا جديدًا..." style="flex:1;" onkeydown="if(event.key==='Enter')addMonthlyGoal('${c.key}')" />
+        <button class="btn" style="width:44px; padding:0; flex-shrink:0;" onclick="addMonthlyGoal('${c.key}')">+</button>
+      </div>
+    </div>`;
+  }).join('')}
+  ${hasGoals ? `<button class="btn secondary" style="margin-top:6px;" onclick="go('monthly_review')">📝 تقييم هذا الشهر</button>` : ''}
   ${mp.aiReview ? companionSpeech(mp.aiReview, 40) : ''}`;
 }
 function screenMonthlyReview(){
@@ -723,24 +726,27 @@ function screenMonthlyReview(){
     return `${topbar('تقييم الشهر', "go('monthly_plan')")}
     <div style="text-align:center; padding-top:60px;"><div class="spinner"></div><p class="muted" style="margin-top:16px;">${COMPANION_NAME} يراجع شهرك الآن...</p></div>`;
   }
-  const activeGoals = MONTHLY_CATEGORIES.filter(c => (mp.goals.find(g=>g.category===c.key)||{}).text);
-  if(activeGoals.length===0){
+  const activeCats = MONTHLY_CATEGORIES.filter(c => mp.goals.some(g=>g.category===c.key && g.text));
+  if(activeCats.length===0){
     return `${topbar('تقييم الشهر', "go('monthly_plan')")}<p class="muted" style="text-align:center; margin-top:30px;">لم تحدد أي أهداف بعد لهذا الشهر.</p>`;
   }
   return `${topbar('تقييم الشهر', "go('monthly_plan')")}
   <div class="card">
-    ${activeGoals.map(c=>{
-      const g = mp.goals.find(x=>x.category===c.key);
+    ${activeCats.map(c=>{
+      const goalsInCat = mp.goals.filter(g=>g.category===c.key && g.text);
       return `<div style="margin-bottom:18px;">
-        <div style="font-weight:700; font-size:13.5px; margin-bottom:8px;">${c.emoji} ${c.label}: <span class="muted" style="font-weight:400;">${g.text}</span></div>
-        <div class="row">
-          ${['-','+','++'].map(r=>`<button class="yn-btn ${g.rating===r?'selected':''}" style="flex:1;" onclick="setGoalRating('${c.key}','${r}')">${r}</button>`).join('')}
-        </div>
+        <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">${c.emoji} ${c.label}</div>
+        ${goalsInCat.map(g=>`<div style="margin-bottom:12px;">
+          <div class="muted" style="font-size:13px; margin-bottom:6px;">${g.text}</div>
+          <div class="row">
+            ${['-','+','++'].map(r=>`<button class="yn-btn ${g.rating===r?'selected':''}" style="flex:1;" onclick="setGoalRating('${g.id}','${r}')">${r}</button>`).join('')}
+          </div>
+        </div>`).join('')}
       </div>`;
     }).join('')}
   </div>
   <p style="font-weight:700; font-size:13.5px; margin:14px 0 8px;">تعليق عام عن شهرك (اختياري)</p>
-  <textarea class="field" id="monthComment" rows="3" placeholder="كيف كان شهرك بشكل عام؟...">${mp.reviewComment||''}</textarea>
+  <textarea class="field" id="monthComment" rows="3" placeholder="كيف كان شهرك بشكل عام؟..." oninput="state.monthlyPlan.reviewComment=this.value">${mp.reviewComment||''}</textarea>
   <button class="btn" style="margin-top:14px;" onclick="submitMonthlyReview()">إرسال للتقييم</button>`;
 }
 function screenLibrary(){
@@ -902,19 +908,19 @@ function screenHome(){
   ${scoreChart()}
 
   <div style="font-weight:800; font-size:14.5px; margin:22px 0 10px;">برنامجك اليومي</div>
-  <div class="moment-card card" onclick="go('morning_adhkar')">
+  <div class="moment-card card" style="${p.morningDone?'opacity:.55; cursor:default;':''}" ${p.morningDone?'':`onclick="go('morning_adhkar')"`}>
     <div class="moment-icon" style="background:var(--amber-light); color:var(--amber);">${ic.sun}</div>
-    <div><div class="moment-title">بداية اليوم</div><div class="moment-sub">أذكار الصباح وتحضير المخطط</div></div>
+    <div><div class="moment-title">بداية اليوم</div><div class="moment-sub">${p.morningDone? 'تم اليوم، موعدنا غدًا 🌿' : 'أذكار الصباح وتحضير المخطط'}</div></div>
     <div class="check" style="color:${p.morningDone?'var(--sage)':'#CFC8B4'};">${p.morningDone?ic.check:ic.arrow}</div>
   </div>
-  <div class="moment-card card" onclick="go('lunch_today')">
+  <div class="moment-card card" style="${p.lunchDone?'opacity:.55; cursor:default;':''}" ${p.lunchDone?'':`onclick="go('lunch_today')"`}>
     <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">${ic.spa}</div>
-    <div><div class="moment-title">استراحة الظهيرة</div><div class="moment-sub">نشاط قصير: تنفس، امتنان، مشي...</div></div>
+    <div><div class="moment-title">استراحة الظهيرة</div><div class="moment-sub">${p.lunchDone? 'تم اليوم، موعدنا غدًا 🌿' : 'نشاط قصير: تنفس، امتنان، مشي...'}</div></div>
     <div class="check" style="color:${p.lunchDone?'var(--sage)':'#CFC8B4'};">${p.lunchDone?ic.check:ic.arrow}</div>
   </div>
-  <div class="moment-card card" onclick="go('evening_intro')">
+  <div class="moment-card card" style="${(p.eveningAdhkarDone&&p.breathingDone)?'opacity:.55; cursor:default;':''}" ${(p.eveningAdhkarDone&&p.breathingDone)?'':`onclick="go('evening_intro')"`}>
     <div class="moment-icon" style="background:var(--dusk-light); color:var(--dusk);">${ic.moon}</div>
-    <div><div class="moment-title">نهاية اليوم</div><div class="moment-sub">إعادة صياغة الأفكار، أذكار وتنفس</div></div>
+    <div><div class="moment-title">نهاية اليوم</div><div class="moment-sub">${(p.eveningAdhkarDone&&p.breathingDone)? 'تم اليوم، موعدنا غدًا 🌙' : 'إعادة صياغة الأفكار، أذكار وتنفس'}</div></div>
     <div class="check" style="color:${(p.eveningAdhkarDone&&p.breathingDone)?'var(--sage)':'#CFC8B4'};">${(p.eveningAdhkarDone&&p.breathingDone)?ic.check:ic.arrow}</div>
   </div>
 
@@ -1022,7 +1028,7 @@ function screenMorningPlanning(){
       tasks.map((t,i)=>`<div class="task-item" style="gap:8px;">
         <div class="checkbox ${t.done?'done':''}" onclick="toggleTask(${i})">${t.done?ic.check:''}</div>
         <input class="field" style="flex:1; padding:8px 10px; font-size:14px; ${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}"
-          value="${t.title}" onchange="renameTask(${i}, this.value)" />
+          value="${t.title}" oninput="state.plan.tasks[${i}].title=this.value" onchange="renameTask(${i}, this.value)" />
         <button class="icon-btn" style="width:32px; height:32px; flex-shrink:0;" title="حذف" onclick="deleteTask(${i})">✕</button>
       </div>`).join('')}
   </div>
@@ -1180,26 +1186,26 @@ function screenCbt(){
   let body='';
   if(s===0){
     body = `${ask('حدّثني... ما الفكرة التي راودتك؟ 💭')}
-    <textarea class="field" rows="4" id="cbtThought" placeholder="اكتب الفكرة كما جاءتك، بدون ترتيب...">${state.cbt.automaticThought}</textarea>
+    <textarea class="field" rows="4" id="cbtThought" placeholder="اكتب الفكرة كما جاءتك، بدون ترتيب..." oninput="state.cbt.automaticThought=this.value">${state.cbt.automaticThought}</textarea>
     ${micButton('cbtThought')}
     <p style="margin-top:16px; font-size:13.5px;">إلى أي درجة تصدّقها الآن؟</p>
-    <input type="range" min="0" max="100" value="${state.cbt.beliefBefore}" oninput="setCbt({beliefBefore:+this.value})"/>
+    <input type="range" min="0" max="100" step="10" value="${state.cbt.beliefBefore}" oninput="setCbt({beliefBefore:+this.value})"/>
     <div class="slider-value">${state.cbt.beliefBefore} / 100</div>
     <button class="btn" style="margin-top:18px;" onclick="cbtStep0Next()">التالي</button>`;
   } else if(s===1){
     body = `${ask('وما الشعور الذي رافق هذه الفكرة؟')}
     <div class="chip-wrap">${EMOTIONS.map(e=>`<span class="chip ${state.cbt.emotion===e?'selected':''}" onclick="setCbt({emotion:'${e}'})">${e}</span>`).join('')}</div>
     <p style="margin-top:18px; font-size:13.5px;">وبأي شدة تشعر به؟</p>
-    <input type="range" min="0" max="100" value="${state.cbt.emotionIntensity}" oninput="setCbt({emotionIntensity:+this.value})"/>
+    <input type="range" min="0" max="100" step="10" value="${state.cbt.emotionIntensity}" oninput="setCbt({emotionIntensity:+this.value})"/>
     <div class="slider-value">${state.cbt.emotionIntensity} / 100</div>
     <button class="btn" style="margin-top:18px;" onclick="cbtStep1Next()">التالي</button>`;
   } else if(s===2){
     body = `${ask('لنكن مثل محقق منصف قليلًا 🔍 ما الذي يدعم هذه الفكرة، وما الذي يعارضها؟')}
     <p style="font-size:13px; font-weight:700; margin-bottom:6px;">أدلة تؤيدها</p>
-    <textarea class="field" rows="3" id="evFor" placeholder="اختياري...">${state.cbt.evidenceFor}</textarea>
+    <textarea class="field" rows="3" id="evFor" placeholder="اختياري..." oninput="state.cbt.evidenceFor=this.value">${state.cbt.evidenceFor}</textarea>
     ${micButton('evFor')}
     <p style="font-size:13px; font-weight:700; margin:14px 0 6px;">أدلة تعارضها</p>
-    <textarea class="field" rows="3" id="evAgainst" placeholder="اختياري...">${state.cbt.evidenceAgainst}</textarea>
+    <textarea class="field" rows="3" id="evAgainst" placeholder="اختياري..." oninput="state.cbt.evidenceAgainst=this.value">${state.cbt.evidenceAgainst}</textarea>
     ${micButton('evAgainst')}
     <button class="btn" style="margin-top:16px;" onclick="cbtStep2Next()">التالي</button>`;
   } else if(s===3){
@@ -1220,13 +1226,13 @@ function screenCbt(){
   } else {
     const improved = state.cbt.beliefOldAfter < state.cbt.beliefBefore;
     body = `${ask('الخطوة الأخيرة ✨ بناءً على كل ما قلته، كيف تعيد صياغة هذه الفكرة الآن؟')}
-    <textarea class="field" rows="3" id="newThought" placeholder="فكرة جديدة، أكثر واقعية...">${state.cbt.newThoughtUser}</textarea>
+    <textarea class="field" rows="3" id="newThought" placeholder="فكرة جديدة، أكثر واقعية..." oninput="state.cbt.newThoughtUser=this.value">${state.cbt.newThoughtUser}</textarea>
     ${micButton('newThought')}
     <p style="margin-top:14px; font-size:13px;">درجة تصديقك للفكرة الجديدة؟</p>
-    <input type="range" min="0" max="100" value="${state.cbt.beliefAfter}" oninput="setCbt({beliefAfter:+this.value})"/>
+    <input type="range" min="0" max="100" step="10" value="${state.cbt.beliefAfter}" oninput="setCbt({beliefAfter:+this.value})"/>
     <div class="slider-value">${state.cbt.beliefAfter} / 100</div>
     <p style="margin-top:14px; font-size:13px;">وكم أصبحت تصدّق الفكرة القديمة الآن؟</p>
-    <input type="range" min="0" max="100" value="${state.cbt.beliefOldAfter}" oninput="setCbt({beliefOldAfter:+this.value})"/>
+    <input type="range" min="0" max="100" step="10" value="${state.cbt.beliefOldAfter}" oninput="setCbt({beliefOldAfter:+this.value})"/>
     <div class="slider-value">${state.cbt.beliefOldAfter} / 100</div>
     ${improved?`<div class="bubble" style="margin-top:14px;"><span></span><span>لاحظ الفرق: من ${state.cbt.beliefBefore} إلى ${state.cbt.beliefOldAfter}. تقدّم حقيقي 👏</span></div>`:''}
     <button class="btn" style="margin-top:20px;" onclick="cbtStep4Next()">إنهاء والانتقال إلى الملخص</button>`;
@@ -1411,7 +1417,7 @@ function screenDayEval(){
   <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
     ${[1,2,3,4,5].map(v=>`<span class="star ${v<=state.plan.dayRating?'active':''}" onclick="setDayRating(${v})">★</span>`).join('')}
   </div>
-  <textarea class="field" id="dayNotesInput" rows="3" placeholder="ملاحظة قصيرة عن يومك (اختياري)...">${state.plan.dayNotes}</textarea>
+  <textarea class="field" id="dayNotesInput" rows="3" placeholder="ملاحظة قصيرة عن يومك (اختياري)..." oninput="state.plan.dayNotes=this.value">${state.plan.dayNotes}</textarea>
   <button class="btn" style="margin-top:18px;" onclick="finishDayEval()">متابعة إلى تمرين التنفس</button>`;
 }
 function toggleEvalTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
@@ -1457,12 +1463,13 @@ function screenBreathing(){
 function stopBreathingEarly(){
   clearInterval(breathPhaseTimer);
   breathPhaseTimer = null;
-  breath = {phase:'inhale', seconds:3, cycles:4};
-  go('home');
+  breath = {phase:'done', seconds:0, cycles:0};
+  render();
+  onDayFinished(false);
 }
 
 /* ---- Note du jour /100 + note IA personnalisée ---- */
-function computeDayScore(plan, cbtCompleted){
+function computeDayScore(plan, cbtCompleted, breathingCompleted){
   let score = 0;
   score += plan.morningDone ? 15 : 0;
   if(plan.tasks.length>0){ score += Math.round((plan.tasks.filter(t=>t.done).length/plan.tasks.length)*15); }
@@ -1470,7 +1477,7 @@ function computeDayScore(plan, cbtCompleted){
   score += plan.lunchDone ? 15 : 0;
   score += cbtCompleted ? 20 : 0;
   score += plan.eveningAdhkarDone ? 10 : 0;
-  score += true ? 10 : 0; // la respiration vient de se terminer à cet instant
+  score += breathingCompleted ? 10 : 0;
   score += plan.dayRating ? Math.round((plan.dayRating/5)*15) : 0;
   return Math.min(100, score);
 }
@@ -1501,9 +1508,11 @@ function fallbackDailyNote(score){
   if(score>=40) return 'لا بأس، كل يوم فيه تقدّم يُحسب، حتى لو كان بسيطًا. حاول غدًا أن تبدأ بخطوة واحدة تشعرك بالإنجاز.';
   return 'يوم صعب، ولكنه ليس فشلًا. الاستمرار في المحاولة هو ما يصنع الفرق. غدًا فرصة جديدة، وأنت قادر عليها.';
 }
-async function onDayFinished(){
+async function onDayFinished(breathingCompleted){
+  if(breathingCompleted === undefined) breathingCompleted = true;
+  await patchPlan({breathingDone:true, breathingSkipped: !breathingCompleted});
   const cbtCompleted = !!state.aiReport;
-  const score = computeDayScore(state.plan, cbtCompleted);
+  const score = computeDayScore(state.plan, cbtCompleted, breathingCompleted);
   await patchPlan({score});
   render(); // affiche l'écran final avec spinner pour la note IA
   const note = await generateDailyNote(state.plan, score);
@@ -1525,11 +1534,13 @@ async function onDayFinished(){
 }
 function screenDayFinished(){
   const score = state.plan.score;
+  const skipped = state.plan.breathingSkipped;
   return `${topbar('اكتمل يومك', null)}
   <div class="confetti-wrap" id="confettiWrap"></div>
   <div style="text-align:center; padding-top:20px;">
     <div style="display:flex; justify-content:center; margin-bottom:10px;">${companionAvatar(56)}</div>
-    <h2 style="font-size:21px;">أحسنت! لقد أنهيت برنامج اليوم كاملًا.</h2>
+    <h2 style="font-size:21px;">${skipped? 'أنهيت يومك، حتى لو لم يكتمل كل شيء 🌿' : 'أحسنت! لقد أنهيت برنامج اليوم كاملًا.'}</h2>
+    ${skipped? `<p class="muted" style="font-size:13px; margin-top:8px;">لاحظنا أنك أوقفت تمرين التنفس قبل انتهائه — لا بأس، حاول إكماله غدًا.</p>`:''}
   </div>
   <div class="card" style="text-align:center; margin-top:18px;">
     ${score==null ? `<div class="spinner"></div><p class="muted" style="margin-top:10px; font-size:13px;">جارٍ حساب نقطتك...</p>` : `
@@ -1574,11 +1585,11 @@ function monthlyPlanKey(email){ return `ansahni:monthlyplan:${email}:${monthKey(
 async function loadMonthlyPlan(){
   if(!DEMO_MODE && supabase && currentUserId){
     const row = await dbLoadOrCreateMonthlyPlan(currentUserId, monthKey());
-    state.monthlyPlan = row ? mapDbMonthlyPlanToState(row) : { goals: MONTHLY_CATEGORIES.map(c=>({category:c.key, text:'', rating:null})), reviewComment:'', aiReview:null };
+    state.monthlyPlan = row ? mapDbMonthlyPlanToState(row) : { goals: [], reviewComment:'', aiReview:null };
     return;
   }
   const saved = await getJson(monthlyPlanKey(state.email), null);
-  state.monthlyPlan = saved || { goals: MONTHLY_CATEGORIES.map(c=>({category:c.key, text:'', rating:null})), reviewComment:'', aiReview:null };
+  state.monthlyPlan = saved || { goals: [], reviewComment:'', aiReview:null };
 }
 async function saveMonthlyPlan(patch){
   state.monthlyPlan = {...state.monthlyPlan, ...patch};
@@ -1593,19 +1604,31 @@ async function openMonthlyPlan(){
   await loadMonthlyPlan();
   go('monthly_plan');
 }
-function saveMonthlyGoals(){
-  const goals = MONTHLY_CATEGORIES.map(c=>{
-    const prev = state.monthlyPlan.goals.find(g=>g.category===c.key) || {};
-    return { category:c.key, text: document.getElementById('goal-'+c.key).value.trim(), rating: prev.rating || null };
-  });
+let monthlyGoalCounter = 0;
+function addMonthlyGoal(catKey){
+  const input = document.getElementById('newgoal-'+catKey);
+  const text = input.value.trim();
+  if(!text) return;
+  const id = catKey + '-' + Date.now() + '-' + (monthlyGoalCounter++);
+  const goals = [...state.monthlyPlan.goals, { id, category:catKey, text, rating:null }];
   saveMonthlyPlan({goals});
 }
-function clearMonthlyGoal(catKey){
-  const goals = state.monthlyPlan.goals.map(g=> g.category===catKey ? {...g, text:'', rating:null} : g);
+function deleteMonthlyGoal(id){
+  const goals = state.monthlyPlan.goals.filter(g=>g.id!==id);
   saveMonthlyPlan({goals});
 }
-function setGoalRating(cat, rating){
-  const goals = state.monthlyPlan.goals.map(g=> g.category===cat ? {...g, rating} : g);
+function renameMonthlyGoalSilent(id, value){
+  const g = state.monthlyPlan.goals.find(x=>x.id===id);
+  if(g) g.text = value;
+}
+function renameMonthlyGoal(id, value){
+  const val = value.trim();
+  if(!val){ deleteMonthlyGoal(id); return; }
+  const goals = state.monthlyPlan.goals.map(g=> g.id===id ? {...g, text:val} : g);
+  saveMonthlyPlan({goals});
+}
+function setGoalRating(id, rating){
+  const goals = state.monthlyPlan.goals.map(g=> g.id===id ? {...g, rating} : g);
   saveMonthlyPlan({goals});
 }
 const MONTHLY_SYSTEM_PROMPT = `أنت ${COMPANION_NAME}، مرافق داعم ضمن تطبيق "انصحني". بناءً على أهداف المستخدم لهذا الشهر في جوانب مختلفة من حياته، وتقييمه الذاتي لكل هدف (- تعني لم يتحقق، + تعني تحقق بشكل جيد، ++ تعني تحقق بامتياز)، وتعليقه العام على شهره، اكتب رأيًا داعمًا ومفيدًا (5-7 جمل):
@@ -1640,12 +1663,12 @@ function planKey(email){ return `ansahni:plan:${email}:${todayStr()}`; }
 async function loadTodayPlan(email){
   if(!DEMO_MODE && supabase && currentUserId){
     const row = await dbLoadOrCreatePlan(currentUserId, todayStr());
-    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
+    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false };
     state.scoreHistory = await dbLoadScoreHistory(currentUserId);
     return;
   }
   const saved = await getJson(planKey(email), null);
-  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
+  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false };
   state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
   state.points = await getJson(`ansahni:points:${email}`, 0);
   state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, true);
@@ -1746,7 +1769,7 @@ async function doLogout(){
     currentUserId = null;
   }
   state.email=''; state.userName='';
-  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null };
+  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false };
   stopSpeech(); setState({screen:'login'});
 }
 
