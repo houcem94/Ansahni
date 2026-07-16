@@ -41,7 +41,9 @@
     padding:16px 28px; backdrop-filter:blur(14px); background:rgba(255,255,255,.55);
     transition:background 1s ease, color .5s ease;
   }
-  .brand{ display:flex; align-items:center; gap:9px; font-family:'Amiri'; font-size:20px; font-weight:700; color:var(--sage-dark); }
+  .brand{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+  .brand-name{ display:flex; align-items:center; gap:9px; font-family:'Amiri'; font-size:20px; font-weight:700; color:var(--sage-dark); }
+  .brand-slogan{ font-size:10.5px; color:var(--ink-soft); font-weight:500; }
   .brand-dot{ width:9px; height:9px; border-radius:50%; background:var(--amber); display:inline-block; }
   .header-actions{ display:flex; gap:10px; }
   .app-panel{
@@ -126,7 +128,8 @@
   #appRoot[data-theme="midday"]{ background:linear-gradient(165deg, #EAF4EE 0%, #DCEEE4 45%, #F3EFE4 100%); }
   #appRoot[data-theme="evening"]{ background:linear-gradient(170deg, #211F3B 0%, #322C57 45%, #453D74 100%); color:#EDEAF6; }
   #appRoot[data-theme="evening"] .app-header{ background:rgba(255,255,255,.06); }
-  #appRoot[data-theme="evening"] .brand{ color:#F6F3FA; }
+  #appRoot[data-theme="evening"] .brand-name{ color:#F6F3FA; }
+  #appRoot[data-theme="evening"] .brand-slogan{ color:rgba(237,234,246,.6); }
   #appRoot[data-theme="evening"] .app-panel{ background:rgba(255,255,255,.05); box-shadow:0 40px 90px -30px rgba(0,0,0,.5); }
   #appRoot[data-theme="evening"] .card{ background:rgba(255,255,255,.07); color:#EDEAF6; box-shadow:none; border:1px solid rgba(255,255,255,.09); }
   #appRoot[data-theme="evening"] .field{ background:rgba(255,255,255,.09); color:#fff; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.16); }
@@ -165,7 +168,13 @@
   <div class="confetti-wrap" id="confettiWrap"></div>
   <header class="app-header" id="appHeader"></header>
   <div class="app-panel">
-    <div class="screen" id="screen"><div style="text-align:center; padding-top:80px;"><div class="spinner"></div></div></div>
+    <div class="screen" id="screen">
+      <div style="text-align:center; padding-top:70px;">
+        <h1 style="font-size:30px; color:var(--sage-dark); font-family:'Amiri',serif;">انصحني</h1>
+        <p style="font-weight:700; color:var(--sage); margin-top:6px; font-size:14px;">سكينة يومك، بين يديك</p>
+        <div class="spinner" style="margin-top:26px;"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -452,6 +461,7 @@ const ic = {
   bellOff:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0M3 3l18 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`
 };
 const COMPANION_NAME = 'أنيس';
+const APP_SLOGAN = 'سكينة يومك، بين يديك';
 let speakRegistry = {}; let speakCounter = 0;
 function registerSpeak(text){ const id='sp'+(speakCounter++); speakRegistry[id]=text; return id; }
 let cachedVoice = null;
@@ -619,7 +629,7 @@ function companionSpeech(text, size){
 
 function renderHeader(){
   const loggedIn = !['login','onboarding','signup'].includes(state.screen);
-  return `<div class="brand"><span class="brand-dot"></span>انصحني</div>
+  return `<div class="brand"><div class="brand-name"><span class="brand-dot"></span>انصحني</div><div class="brand-slogan">${APP_SLOGAN}</div></div>
   ${loggedIn ? `<div class="header-actions">
     <button class="icon-btn" title="${state.notificationsEnabled?'إيقاف تذكيرات اليوم':'تفعيل تذكيرات اليوم'}"
       style="${state.notificationsEnabled?'background:var(--amber); color:#fff;':''}" onclick="toggleNotifications()">${state.notificationsEnabled?ic.bell:ic.bellOff}</button>
@@ -901,6 +911,7 @@ function screenLogin(){
   <div style="text-align:center; padding:34px 0 6px;">
     <div style="display:flex; justify-content:center; margin-bottom:14px;">${companionAvatar(96)}</div>
     <h1 style="font-size:34px; color:var(--sage-dark);">انصحني</h1>
+    <p style="font-weight:700; color:var(--sage); margin-top:4px; font-size:14.5px;">${APP_SLOGAN}</p>
     <p class="muted" style="margin-top:8px; font-size:14px;">مرافقك اليومي للتحسّن التدريجي</p>
     <p style="margin:16px auto 0; max-width:340px; font-size:13.5px; line-height:1.9; color:var(--ink-soft);">
       كل يوم معك: أذكار الصباح وتخطيط بسيط، استراحة منتصف اليوم، وفي المساء
