@@ -268,6 +268,7 @@ function planToDbFields(plan){
     evening_adhkar_done: plan.eveningAdhkarDone, breathing_exercise_done: plan.breathingDone,
     breathing_skipped: plan.breathingSkipped || false,
     reminders_shown: plan.remindersShown || {},
+    daily_tip: plan.dailyTip || null,
     day_rating: plan.dayRating || null, day_review_notes: plan.dayNotes || null,
     day_score: plan.score, day_note: plan.dailyNote, points_awarded: plan.pointsAwarded,
     main_emotion: plan.mainEmotion || null
@@ -280,6 +281,7 @@ function mapDbPlanToState(row){
     eveningAdhkarDone: row.evening_adhkar_done, breathingDone: row.breathing_exercise_done,
     breathingSkipped: row.breathing_skipped || false,
     remindersShown: row.reminders_shown || {},
+    dailyTip: row.daily_tip || null,
     dayRating: row.day_rating || 0, dayNotes: row.day_review_notes || '',
     score: row.day_score, dailyNote: row.day_note, pointsAwarded: row.points_awarded || false,
     mainEmotion: row.main_emotion || null
@@ -411,7 +413,7 @@ const ONBOARDING_SLIDES = [
 
 let state = {
   screen:'login', authError:'', email:'',
-  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false },
+  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null },
   cbt:{ step:0, showReflection:false, reflectionText:'', reflectionLoading:false,
     automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50, evidenceFor:'', evidenceAgainst:'',
     helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 },
@@ -664,14 +666,13 @@ function heroCard(){
   const slot = currentTimeSlot();
   const p = state.plan;
   const doneMap = { morning:p.morningDone, midday:p.lunchDone, evening:(p.eveningAdhkarDone && p.breathingDone) };
-  let activeSlot = slot;
-  if(doneMap[slot]){
-    const order = ['morning','midday','evening'];
-    const next = order.find(s=>!doneMap[s]);
-    if(next) activeSlot = next;
-  }
+  const order = ['morning','midday','evening'];
+  const arrivedSlots = order.slice(0, order.indexOf(slot)+1); // لا نقترح أبدًا فترة لم يحن وقتها بعد
+  let activeSlot = arrivedSlots.find(s=>!doneMap[s]);
+  if(!activeSlot) activeSlot = slot; // كل ما حان وقته اليوم أُنجز بالفعل
   const m = SLOT_META[activeSlot];
   const isDone = doneMap[activeSlot];
+  const isFullyDoneForNow = isDone && activeSlot===slot;
   return `
   <div class="card" style="background:${m.bg}; border:none; padding:22px;">
     <div style="display:flex; align-items:center; gap:14px;">
@@ -681,7 +682,7 @@ function heroCard(){
         <div style="font-weight:800; font-size:16.5px;">${isDone? 'أحسنت! أكملت هذه المرحلة 🎉' : m.title}</div>
       </div>
     </div>
-    <p style="font-size:13.5px; margin:12px 0 14px; color:var(--ink-soft);">${isDone? 'يمكنك تصفح مكتبة النصائح أو انتظار الموعد التالي.' : m.text}</p>
+    <p style="font-size:13.5px; margin:12px 0 14px; color:var(--ink-soft);">${isDone? (isFullyDoneForNow? 'استمتع بوقتك، وسنذكّرك عند اقتراب الموعد التالي 🌿' : 'انتقل إلى القسم التالي عندما يحين وقته.') : m.text}</p>
     ${!isDone ? `<button class="btn" onclick="${m.action}">${m.cta}</button>` : ''}
   </div>
   <div style="display:flex; gap:8px; margin:12px 0 18px;">
@@ -1004,20 +1005,60 @@ function screenHome(){
 }
 function tasksReminderCard(){
   const tasks = state.plan.tasks;
-  if(!tasks || tasks.length===0) return '';
   const pending = tasks.filter(t=>!t.done).length;
   return `<div class="card">
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
       ${companionAvatar(30)}
-      <div style="font-weight:700; font-size:14px;">${pending>0 ? `لا تنسَ، بقي ${pending} من مهامك اليوم:` : 'أحسنت، أنجزت كل مهامك اليوم! 🎉'}</div>
+      <div style="font-weight:700; font-size:14px;">${tasks.length===0 ? 'ما مهامك لهذا اليوم؟' : pending>0 ? `لا تنسَ، بقي ${pending} من مهامك اليوم:` : 'أحسنت، أنجزت كل مهامك اليوم! 🎉'}</div>
     </div>
-    ${tasks.map((t,i)=>`<div class="task-item"><div class="checkbox ${t.done?'done':''}" onclick="toggleHomeTask(${i})">${t.done?ic.check:''}</div>
-      <span style="${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}">${t.title}</span></div>`).join('')}
+    ${tasks.map((t,i)=>`<div class="task-item" style="gap:8px;">
+      <div class="checkbox ${t.done?'done':''}" onclick="toggleHomeTask(${i})">${t.done?ic.check:''}</div>
+      <input class="field" style="flex:1; padding:7px 10px; font-size:13.5px; ${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}"
+        value="${t.title}" oninput="state.plan.tasks[${i}].title=this.value" onchange="renameTask(${i}, this.value)" />
+      <button class="icon-btn" style="width:30px; height:30px; flex-shrink:0;" title="حذف" onclick="deleteTask(${i})">✕</button>
+    </div>`).join('')}
+    <div class="row" style="margin-top:${tasks.length>0?'10px':'0'};">
+      <input class="field" id="homeTaskInput" placeholder="أضف مهمة..." style="flex:1;" onkeydown="if(event.key==='Enter')addTask('homeTaskInput')"/>
+      <button class="btn" style="width:44px; padding:0; flex-shrink:0;" onclick="addTask('homeTaskInput')">+</button>
+    </div>
   </div>`;
 }
 function toggleHomeTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
+const DAILY_TIP_SYSTEM_PROMPT = `أنت ${COMPANION_NAME}، مرافق داعم ضمن تطبيق "انصحني". اكتب نصيحة عملية قصيرة ومختلفة، تجمع بين البعد النفسي والروحي، تناسب أي شخص في يوم عادي (ليست لمشكلة محددة).
+نوّع كل مرة بين مواضيع مثل: الصبر، الشكر، ضبط النفس، التفاؤل، العلاقات، الإنتاجية، الراحة النفسية، حسن الظن، التسامح، إلخ — لا تكرر نفس الفكرة دائمًا.
+أجب حصرًا بصيغة JSON دون أي نص إضافي: {"title":"عنوان قصير من 3 إلى 5 كلمات", "steps":["خطوة عملية قصيرة 1","خطوة عملية قصيرة 2","خطوة عملية قصيرة 3"], "dhikr":"ذكر أو دعاء قصير مناسب", "maxim":"حكمة أو مقولة ملهمة قصيرة"}`;
+async function generateDailyTipAI(){
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:400, system:DAILY_TIP_SYSTEM_PROMPT, messages:[{role:"user", content:"اقترح نصيحة اليوم لتاريخ "+todayStr()}] })
+    });
+    const data = await res.json();
+    const raw = (data.content||[]).map(b=>b.text||'').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    if(parsed && parsed.title && Array.isArray(parsed.steps)) return parsed;
+    throw new Error('invalid tip shape');
+  }catch(e){
+    console.error('generateDailyTipAI error, fallback إلى المكتبة الثابتة:', e);
+    return pickTipOfDay();
+  }
+}
+async function ensureDailyTip(){
+  if(state.plan.dailyTip || state.dailyTipLoading) return;
+  state.dailyTipLoading = true;
+  const tip = await generateDailyTipAI();
+  state.dailyTipLoading = false;
+  await patchPlan({dailyTip: tip});
+}
 function dailyTipCard(){
-  const t = pickTipOfDay();
+  if(!state.plan.dailyTip){
+    ensureDailyTip();
+    return `<div class="card" style="text-align:center; padding:22px 10px;">
+      <div class="spinner"></div>
+      <p class="muted" style="margin-top:12px; font-size:13px;">${COMPANION_NAME} يُعِدّ نصيحة اليوم...</p>
+    </div>`;
+  }
+  const t = state.plan.dailyTip;
   return `<div class="card">
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
       ${companionAvatar(30)}
@@ -1079,7 +1120,7 @@ function screenMorningAdhkar(){
     <p style="font-weight:700; color:var(--sage-dark); text-align:center; margin-bottom:16px; font-size:14px;">خذ نفسًا هادئًا، وابدأ يومك بذكر الله 🌿</p>
     ${MORNING_ADHKAR.map((a,i)=>`<p style="font-family:'Amiri'; font-size:16px; line-height:2.15; margin:0 0 ${i<MORNING_ADHKAR.length-1?'16px':'0'}; ${i<MORNING_ADHKAR.length-1?'padding-bottom:16px; border-bottom:1px solid var(--sand-deep);':''}">${a}</p>`).join('')}
   </div>
-  <button class="btn" style="margin-top:14px;" onclick="patchPlan({morningDone:true}); go('morning_planning')">أنهيت الأذكار، انتقل إلى المخطط</button>`;
+  <button class="btn" style="margin-top:14px;" onclick="patchPlan({morningDone:true}); go('home')">أنهيت الأذكار، انتقل إلى الرئيسية</button>`;
 }
 function screenMorningPlanning(){
   const tasks = state.plan.tasks;
@@ -1730,12 +1771,12 @@ function planKey(email){ return `ansahni:plan:${email}:${todayStr()}`; }
 async function loadTodayPlan(email){
   if(!DEMO_MODE && supabase && currentUserId){
     const row = await dbLoadOrCreatePlan(currentUserId, todayStr());
-    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false };
+    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
     state.scoreHistory = await dbLoadScoreHistory(currentUserId);
     return;
   }
   const saved = await getJson(planKey(email), null);
-  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false };
+  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
   state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
   state.points = await getJson(`ansahni:points:${email}`, 0);
   state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, true);
@@ -1751,8 +1792,8 @@ async function patchPlan(patch){
   }
   await setJson(planKey(state.email), state.plan);
 }
-function addTask(){
-  const input = document.getElementById('taskInput');
+function addTask(inputId){
+  const input = document.getElementById(inputId || 'taskInput');
   const val = input.value.trim(); if(!val) return;
   state.plan.tasks.push({title:val, done:false});
   patchPlan({tasks: state.plan.tasks});
@@ -1841,7 +1882,7 @@ async function doLogout(){
     currentUserId = null;
   }
   state.email=''; state.userName='';
-  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false };
+  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
   stopSpeech(); setState({screen:'login'});
 }
 
