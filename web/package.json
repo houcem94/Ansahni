@@ -1,0 +1,9 @@
+{
+  "name": "ansahni-web",
+  "private": true,
+  "dependencies": {
+    "@netlify/functions": "^2.8.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "web-push": "^3.6.7"
+  }
+}
