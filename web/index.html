@@ -300,7 +300,22 @@ function mapDbPlanToState(row){
 const todayStr = () => new Date().toISOString().substring(0,10);
 
 const EMOTIONS = ['الخزي والعار','الذنب','جلد الذات','الاحتقار','الحزن والأسى','الندم','الإشمئزاز','التوتر','الخوف','الغضب','الغيرة','النقص','الرفض','الكراهية','الحقد','الفوبيا','الشفقة'];
-const THINKING_ERRORS = ['التفكير الثنائي (أبيض أو أسود)','التهويل والتضخيم','التعميم المفرط','قراءة الأفكار','التنبؤ السلبي بالمستقبل','معايير "يجب" و"لازم"','التركيز على السلبي فقط','أخذ الأمور بشكل شخصي'];
+const THINKING_ERRORS = [
+  { name:'الاستنتاج التعسفي', def:'استخلاص نتيجة دون وجود دليل كافٍ يدعمها.' },
+  { name:'التجريد الانتقائي', def:'التركيز على جزء واحد من الموقف وتجاهل باقي التفاصيل.' },
+  { name:'التعميم الزائد', def:'استخدام كلمات مثل "دائمًا" أو "أبدًا" بناءً على حادثة واحدة فقط.' },
+  { name:'التهويل والتصغير', def:'تضخيم الجوانب السلبية وتصغير الإيجابية، أو العكس.' },
+  { name:'الشخصنة', def:'تحميل نفسك مسؤولية أمور لا تخصك بالكامل أو خارجة عن إرادتك.' },
+  { name:'التفكير الثنائي', def:'رؤية الأمور والأشخاص كأبيض أو أسود، دون درجات وسطى.' },
+  { name:'العنونة وإصدار الأحكام', def:'إلصاق صفة ثابتة بشخص بدلاً من وصف سلوك محدد.' },
+  { name:'قراءة الأفكار', def:'الافتراض بمعرفة ما يفكر فيه الآخرون دون أي دليل فعلي.' },
+  { name:'الإلزامات', def:'استخدام "يجب" و"لازم" بصرامة مع نفسك أو مع الآخرين.' },
+  { name:'التعجيز', def:'الحكم على نفسك بالعجز التام: "لن أستطيع"، "مستحيل".' },
+  { name:'التفكير الكارثي', def:'توقع أسوأ النتائج الممكنة وتضخيم خطورة الموقف.' },
+  { name:'الاستدلال الانفعالي', def:'اعتبار شعورك دليلًا على الحقيقة: "أنا حاسس كذا، فهذا صحيح".' },
+  { name:'المقارنة المُقحفة', def:'مقارنة نقاط ضعفك بنقاط قوة الآخرين بطريقة غير منطقية.' },
+  { name:'التوقع', def:'الحكم على الآخرين بناءً على توقعاتك منهم لا على تصرفاتهم الفعلية.' },
+];
 const MORNING_ADHKAR = [
   'أَصْبَحْنَا عَلَى فِطْرَةِ الْإِسْلَامِ، وَكَلِمَةِ الْإِخْلَاصِ، وَدِينِ نَبِيِّنَا مُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ، وَمِلَّةِ إِبْرَاهِيمَ حَنِيفًا مُسْلِمًا وَمَا كَانَ مِنَ الْمُشْرِكِينَ.',
   'اللَّهُمَّ فَاطِرَ السَّمَاوَاتِ وَالْأَرْضِ، عَالِمَ الْغَيْبِ وَالشَّهَادَةِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا أَنْتَ، أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي وَمِنْ شَرِّ الشَّيْطَانِ وَشِرْكِهِ، وَأَنْ أَقْتَرِفَ عَلَى نَفْسِي سُوءًا أَوْ أَجُرَّهُ إِلَى مُسْلِمٍ.',
@@ -374,6 +389,17 @@ const DR_VIDEOS = [
   { id:'iBSWh3Q0ODE', title:'التعامل مع الفشل', emotions:['الندم','النقص'], keywords:['الفشل','خيبة أمل','الإحباط'] },
   { id:'fo_WjF8mCdM', title:'Overthinking - التفكير الزائد', emotions:['التوتر','الخوف'], keywords:['التفكير الزائد','القلق','الأفكار المتكررة','overthinking'] },
   { id:'szJmoRsAtwQ', title:'التعامل مع العصبية', emotions:['الغضب'], keywords:['العصبية','الانفعال','ضبط النفس'] },
+  { id:'1B-BVO7unJg', title:'التعامل مع الماضي', emotions:['الندم','الحزن والأسى'], keywords:['الماضي','ذكريات مؤلمة','التحرر من الماضي'] },
+  { id:'GN98SIK1Mhk', title:'التفكير السلبي', emotions:['الحزن والأسى','التوتر'], keywords:['التفكير السلبي','تشاؤم','أفكار سوداوية'] },
+  { id:'WpJd8BJmT2Q', title:'كيف أُحب نفسي؟', emotions:['النقص','الاحتقار'], keywords:['حب الذات','تقدير الذات','قيمة الإنسان'] },
+  { id:'B9uqInjdbaw', title:'الأرق وقلة النوم', emotions:['التوتر'], keywords:['الأرق','قلة النوم','اضطراب النوم'] },
+  { id:'76E9bI4G4xA', title:'التسويف والمُماطلة', emotions:['التوتر','الذنب'], keywords:['التسويف','المماطلة','تأجيل المهام'] },
+  { id:'K9-L5lLpktE', title:'كيف أتعامل مع الغضب', emotions:['الغضب'], keywords:['الغضب','الانفعال','ضبط النفس'] },
+  { id:'_vJV-zkynGg', title:'كيف أتعامل مع السلبيين؟', emotions:['الرفض','الغضب'], keywords:['أشخاص سلبيون','التعامل مع الآخرين','طاقة سلبية'] },
+  { id:'07c-ls-DMVE', title:'كيف أتعامل مع الحزن؟', emotions:['الحزن والأسى'], keywords:['الحزن','الأسى','الشجن'] },
+  { id:'l621xyc8bRQ', title:'كيف أتغلب على التوتر', emotions:['التوتر'], keywords:['التوتر','القلق','الاسترخاء'] },
+  { id:'JUNxoLpi2Ac', title:'كيف أتعامل مع الضغوط؟', emotions:['التوتر'], keywords:['ضغوط الحياة','ضغط نفسي','إدارة الضغط'] },
+  { id:'ZhGDZtGjTcQ', title:'كيف أتغير للأفضل؟', emotions:[], keywords:['تغيير','تطوير الذات','تحسين النفس','بداية جديدة'] },
 ];
 function findVideoForEmotion(emotion){ return DR_VIDEOS.find(v=>v.emotions.includes(emotion)) || null; }
 
@@ -562,10 +588,24 @@ function checkReminders(){
   if(changed) patchPlan({remindersShown: shown});
 }
 let reminderInterval = null;
+async function checkDateRollover(){
+  if(!state.email) return;
+  const today = todayStr();
+  if(state.loadedPlanDate && state.loadedPlanDate !== today){
+    await loadTodayPlan(state.email);
+    render();
+  }
+}
 function startReminderLoop(){
   if(reminderInterval) return;
+  checkDateRollover();
   checkReminders();
-  reminderInterval = setInterval(checkReminders, 60000);
+  reminderInterval = setInterval(()=>{ checkDateRollover(); checkReminders(); }, 60000);
+}
+if(typeof document !== 'undefined'){
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible'){ checkDateRollover(); checkReminders(); }
+  });
 }
 /* ---- تسجيل صوتي (يُستخدم فقط في حقول تمرين إعادة صياغة الأفكار) ---- */
 let activeRecognition = null;
@@ -1024,9 +1064,7 @@ function tasksReminderCard(){
     </div>
     ${tasks.map((t,i)=>`<div class="task-item" style="gap:8px;">
       <div class="checkbox ${t.done?'done':''}" onclick="toggleHomeTask(${i})">${t.done?ic.check:''}</div>
-      <input class="field" style="flex:1; padding:7px 10px; font-size:13.5px; ${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}"
-        value="${t.title}" oninput="state.plan.tasks[${i}].title=this.value" onchange="renameTask(${i}, this.value)" />
-      <button class="icon-btn" style="width:30px; height:30px; flex-shrink:0;" title="حذف" onclick="deleteTask(${i})">✕</button>
+      <span style="flex:1; font-size:13.5px; ${t.done?'text-decoration:line-through; color:var(--ink-soft);':''}">${t.title}</span>
     </div>`).join('')}
     <div class="row" style="margin-top:${tasks.length>0?'10px':'0'};">
       <input class="field" id="homeTaskInput" placeholder="أضف مهمة..." style="flex:1;" onkeydown="if(event.key==='Enter')addTask('homeTaskInput')"/>
@@ -1131,7 +1169,7 @@ function screenMorningAdhkar(){
     <p style="font-weight:700; color:var(--sage-dark); text-align:center; margin-bottom:16px; font-size:14px;">خذ نفسًا هادئًا، وابدأ يومك بذكر الله 🌿</p>
     ${MORNING_ADHKAR.map((a,i)=>`<p style="font-family:'Amiri'; font-size:16px; line-height:2.15; margin:0 0 ${i<MORNING_ADHKAR.length-1?'16px':'0'}; ${i<MORNING_ADHKAR.length-1?'padding-bottom:16px; border-bottom:1px solid var(--sand-deep);':''}">${a}</p>`).join('')}
   </div>
-  <button class="btn" style="margin-top:14px;" onclick="patchPlan({morningDone:true}); go('home')">أنهيت الأذكار، انتقل إلى الرئيسية</button>`;
+  <button class="btn" style="margin-top:14px;" onclick="patchPlan({morningDone:true}); go('morning_planning')">أنهيت الأذكار، انتقل إلى المخطط</button>`;
 }
 function screenMorningPlanning(){
   const tasks = state.plan.tasks;
@@ -1339,8 +1377,20 @@ function screenCbt(){
       <button class="yn-btn ${state.cbt.harmsNow===true?'selected':''}" onclick="setCbt({harmsNow:true})">نعم</button>
       <button class="yn-btn ${state.cbt.harmsNow===false?'selected':''}" onclick="setCbt({harmsNow:false})">لا</button>
     </div>
-    <p style="font-size:13px; font-weight:700; margin-bottom:8px;">هل تلاحظ نمط تفكير معينًا؟ (اختياري)</p>
-    <div class="chip-wrap">${THINKING_ERRORS.map(e=>`<span class="chip ${state.cbt.thinkingErrors.includes(e)?'selected':''}" onclick="toggleThinkingError('${e}')">${e}</span>`).join('')}</div>
+    <p style="font-size:13px; font-weight:700; margin-bottom:4px;">هل تلاحظ نمط تفكير معينًا؟ (اختياري، حتى 3 كحد أقصى)</p>
+    <p class="muted" style="font-size:11.5px; margin-bottom:10px;">اختر ما ينطبق على فكرتك — لا حاجة لفهمها جميعًا، فقط ما يبدو مألوفًا لك.</p>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${THINKING_ERRORS.map(e=>{
+        const selected = state.cbt.thinkingErrors.includes(e.name);
+        return `<div class="task-item" style="cursor:pointer; border-radius:12px; padding:10px 12px; background:${selected?'var(--sage-light)':'transparent'};" onclick="toggleThinkingError('${e.name}')">
+          <div class="checkbox ${selected?'done':''}" style="margin-top:2px;">${selected?ic.check:''}</div>
+          <div>
+            <div style="font-weight:700; font-size:13.5px;">${e.name}</div>
+            <div class="muted" style="font-size:12px; margin-top:2px; line-height:1.6;">${e.def}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
     <button class="btn" style="margin-top:20px;" ${(state.cbt.helpsNow===null||state.cbt.harmsNow===null)?'disabled':''} onclick="cbtStep3Next()">التالي</button>`;
   } else {
     const improved = state.cbt.beliefOldAfter < state.cbt.beliefBefore;
@@ -1382,16 +1432,25 @@ function cbtStep2Next(){
   const evFor = document.getElementById('evFor').value.trim();
   const evAgainst = document.getElementById('evAgainst').value.trim();
   setCbt({evidenceFor:evFor, evidenceAgainst:evAgainst});
-  nextWithReflection(
-    `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لا شيء محدد'}"، وكأدلة معارضة: "${evAgainst||'لا شيء محدد'}". اكتب تعليقًا (3-4 جمل): قدّر موضوعيته في النظر للجهتين، وأبرز بلطف ما تكشفه هذه الموازنة. ثم أضف جملة أخيرة تقترح عليه خطوة عملية صغيرة واحدة جدًا (لا تأخذ أكثر من دقيقة أو دقيقتين) يمكنه تجربتها الآن أو خلال اليوم لاختبار مدى واقعية هذه الفكرة في الواقع، واجعل هذه الخطوة واضحة ومحددة وليست عامة.`,
-    'موازنتك بين الأدلة المؤيدة والمعارضة خطوة مهمة نحو رؤية أكثر توازنًا. كخطوة صغيرة، جرّب أن تسأل شخصًا تثق به عن رأيه الصادق في هذا الموقف اليوم.'
-  );
+  const bothEmpty = !evFor && !evAgainst;
+  const promptContext = bothEmpty
+    ? `بخصوص الفكرة "${state.cbt.automaticThought}"، لم يكتب المستخدم أي أدلة مؤيدة أو معارضة (ترك الحقلين فارغين تمامًا). لا تمدحه أو تتصرف وكأنه أجاب. اكتب تعليقًا واقعيًا وقصيرًا (2-3 جمل) يشجعه بصدق ولطف على المحاولة ولو بجملة واحدة بسيطة، ويوضح أن هذا سيساعده على رؤية فكرته بوضوح أكبر.`
+    : `بخصوص الفكرة "${state.cbt.automaticThought}"، ذكر المستخدم كأدلة مؤيدة: "${evFor||'لم يذكر شيئًا هنا'}"، وكأدلة معارضة: "${evAgainst||'لم يذكر شيئًا هنا'}". اكتب تعليقًا (3-4 جمل) يتفاعل تحديدًا مع ما كتبه فعليًا. إن ترك أحد الجانبين فارغًا، شجّعه بلطف على التفكير فيه أيضًا دون لوم. ثم أضف جملة أخيرة تقترح عليه خطوة عملية صغيرة جدًا (لا تأخذ أكثر من دقيقة أو دقيقتين) يمكنه تجربتها الآن لاختبار مدى واقعية هذه الفكرة، واجعلها واضحة ومحددة.`;
+  const fallback = bothEmpty
+    ? 'لاحظت أنك تركت هذا الجزء فارغًا — حاول في المرة القادمة كتابة جملة واحدة فقط، ولو بسيطة، فهذا يساعدك على رؤية فكرتك بوضوح أكبر.'
+    : 'شكرًا لمشاركتك هذه الأدلة، فهي خطوة مهمة نحو رؤية أكثر توازنًا. كخطوة صغيرة، جرّب أن تسأل شخصًا تثق به عن رأيه الصادق في هذا الموقف اليوم.';
+  nextWithReflection(promptContext, fallback);
 }
 state.helpsNowText = () => state.cbt.helpsNow===true?'نعم':state.cbt.helpsNow===false?'لا':'غير محدد';
 state.harmsNowText = () => state.cbt.harmsNow===true?'نعم':state.cbt.harmsNow===false?'لا':'غير محدد';
 function toggleThinkingError(e){
-  const arr = state.cbt.thinkingErrors.includes(e) ? state.cbt.thinkingErrors.filter(x=>x!==e) : [...state.cbt.thinkingErrors, e];
-  setCbt({thinkingErrors:arr});
+  const arr = state.cbt.thinkingErrors;
+  if(arr.includes(e)){
+    setCbt({thinkingErrors: arr.filter(x=>x!==e)});
+  } else {
+    if(arr.length>=3){ alert('يمكنك اختيار 3 أخطاء تفكير كحد أقصى.'); return; }
+    setCbt({thinkingErrors:[...arr, e]});
+  }
 }
 function cbtStep3Next(){
   const errs = state.cbt.thinkingErrors;
@@ -1411,7 +1470,9 @@ function cbtStep4Next(){
 
 /* ---- Appels IA réels (API Anthropic, disponible dans cet aperçu) ---- */
 const STEP_SYSTEM_PROMPT = `أنت مساعد نفسي داعم ضمن تطبيق "انصحني"، يرافق المستخدم في تمرين "تقييم الأفكار التلقائية" (CBT/ACT).
-اكتب حصرًا 2 إلى 4 جمل قصيرة بالعربية الفصحى البسيطة، بأسلوب دافئ ومحترم ومشجّع، دون أي مقدمات أو عناوين.
+اكتب من 2 إلى 4 جمل قصيرة بالعربية الفصحى البسيطة، بأسلوب دافئ ومحترم ومشجّع، دون أي مقدمات أو عناوين.
+مهم جدًا: لا تبدأ دائمًا بنفس العبارة أو نفس القالب (مثل "من الطبيعي أن..." أو "شكرًا لمشاركتك")، بل نوّع صياغتك وبدايتك في كل مرة بما يناسب تحديدًا ما كتبه المستخدم، وعلّق على مضمون إجابته الفعلي لا بعبارات عامة جاهزة.
+كن واقعيًا وصادقًا دائمًا: إذا لم يكتب المستخدم شيئًا أو ترك حقلًا فارغًا، لا تمدحه أو تتصرف وكأنه أجاب، بل شجّعه بلطف وبصدق على المحاولة والكتابة، موضحًا أن ذلك سيفيده أكثر. لا تخترع إنجازًا لم يحدث.
 لا تقدّم تشخيصًا طبيًا أو نفسيًا أبدًا ولا تصف أدوية. لا تكرر كلام المستخدم حرفيًا، بل أعد صياغته بإيجاز.`;
 async function aiStepFeedback(promptContext, fallbackText){
   try{
@@ -1784,6 +1845,7 @@ async function loadTodayPlan(email){
     const row = await dbLoadOrCreatePlan(currentUserId, todayStr());
     state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
     state.scoreHistory = await dbLoadScoreHistory(currentUserId);
+    state.loadedPlanDate = todayStr();
     return;
   }
   const saved = await getJson(planKey(email), null);
@@ -1792,6 +1854,7 @@ async function loadTodayPlan(email){
   state.points = await getJson(`ansahni:points:${email}`, 0);
   state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, true);
   state.notificationsEnabled = await getJson(`ansahni:notifications:${email}`, false);
+  state.loadedPlanDate = todayStr();
   startReminderLoop();
 }
 async function patchPlan(patch){
