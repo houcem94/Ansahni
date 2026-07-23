@@ -811,7 +811,6 @@ function screenVideoDetail(){
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     </div>
   </div>
-  <p class="muted" style="font-size:12px; text-align:center; margin-top:6px;">قد لا يعمل التشغيل داخل هذه المعاينة المدمجة — سيعمل بشكل طبيعي بعد نشر التطبيق.</p>
   <button class="btn" style="margin-top:14px;" onclick="${back}">رجوع</button>`;
 }
 function screenMonthlyPlan(){
@@ -1074,13 +1073,28 @@ function tasksReminderCard(){
 }
 function toggleHomeTask(i){ state.plan.tasks[i].done = !state.plan.tasks[i].done; patchPlan({tasks: state.plan.tasks}); }
 const DAILY_TIP_SYSTEM_PROMPT = `أنت ${COMPANION_NAME}، مرافق داعم ضمن تطبيق "انصحني". اكتب نصيحة عملية قصيرة ومختلفة، تجمع بين البعد النفسي والروحي، تناسب أي شخص في يوم عادي (ليست لمشكلة محددة).
-نوّع كل مرة بين مواضيع مثل: الصبر، الشكر، ضبط النفس، التفاؤل، العلاقات، الإنتاجية، الراحة النفسية، حسن الظن، التسامح، إلخ — لا تكرر نفس الفكرة دائمًا.
+نوّع كل مرة بين مواضيع مثل: الصبر، الشكر، ضبط النفس، التفاؤل، العلاقات، الإنتاجية، الراحة النفسية، حسن الظن، التسامح، إلخ.
+مهم جدًا: إن أُعطيت قائمة بعناوين استُخدمت في الأيام السابقة، فيجب أن يكون عنوان اليوم وموضوعه مختلفين عنها تمامًا — لا تكرر نفس الفكرة أو صياغة قريبة منها.
 أجب حصرًا بصيغة JSON دون أي نص إضافي: {"title":"عنوان قصير من 3 إلى 5 كلمات", "steps":["خطوة عملية قصيرة 1","خطوة عملية قصيرة 2","خطوة عملية قصيرة 3"], "dhikr":"ذكر أو دعاء قصير مناسب", "maxim":"حكمة أو مقولة ملهمة قصيرة"}`;
-async function generateDailyTipAI(){
+async function getRecentTipTitles(limit){
+  if(!DEMO_MODE && supabase && currentUserId){
+    try{
+      const { data } = await supabase.from('daily_plans').select('daily_tip')
+        .eq('user_id', currentUserId).not('daily_tip','is',null).order('plan_date',{ascending:false}).limit(limit);
+      return (data||[]).map(r=> r.daily_tip && r.daily_tip.title).filter(Boolean);
+    }catch(e){ console.error(e); return []; }
+  }
+  const hist = await getJson(`ansahni:tiptitles:${state.email}`, []);
+  return hist.slice(-limit);
+}
+async function generateDailyTipAI(recentTitles){
   try{
+    const avoidNote = (recentTitles && recentTitles.length)
+      ? `تجنّب تمامًا هذه العناوين المستخدمة سابقًا، واختر موضوعًا مختلفًا عنها: ${recentTitles.join('، ')}`
+      : '';
     const res = await fetch("/.netlify/functions/ai-proxy", {
       method:"POST", headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ max_tokens:400, system:DAILY_TIP_SYSTEM_PROMPT, messages:[{role:"user", content:"اقترح نصيحة اليوم لتاريخ "+todayStr()}] })
+      body: JSON.stringify({ max_tokens:400, system:DAILY_TIP_SYSTEM_PROMPT, messages:[{role:"user", content:"اقترح نصيحة اليوم لتاريخ "+todayStr()+(avoidNote? "\n"+avoidNote:'')}] })
     });
     const data = await res.json();
     const raw = (data.content||[]).map(b=>b.text||'').join('');
@@ -1095,9 +1109,15 @@ async function generateDailyTipAI(){
 async function ensureDailyTip(){
   if(state.plan.dailyTip || state.dailyTipLoading) return;
   state.dailyTipLoading = true;
-  const tip = await generateDailyTipAI();
+  const recentTitles = await getRecentTipTitles(7);
+  const tip = await generateDailyTipAI(recentTitles);
   state.dailyTipLoading = false;
   await patchPlan({dailyTip: tip});
+  if(DEMO_MODE || !supabase){
+    const hist = await getJson(`ansahni:tiptitles:${state.email}`, []);
+    hist.push(tip.title);
+    await setJson(`ansahni:tiptitles:${state.email}`, hist.slice(-10));
+  }
 }
 function dailyTipCard(){
   if(!state.plan.dailyTip){
