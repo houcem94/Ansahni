@@ -278,6 +278,7 @@ function planToDbFields(plan){
     breathing_skipped: plan.breathingSkipped || false,
     reminders_shown: plan.remindersShown || {},
     daily_tip: plan.dailyTip || null,
+    act_done: plan.actDone || false, act_summary: plan.actSummary || null,
     day_rating: plan.dayRating || null, day_review_notes: plan.dayNotes || null,
     day_score: plan.score, day_note: plan.dailyNote, points_awarded: plan.pointsAwarded,
     main_emotion: plan.mainEmotion || null
@@ -291,6 +292,7 @@ function mapDbPlanToState(row){
     breathingSkipped: row.breathing_skipped || false,
     remindersShown: row.reminders_shown || {},
     dailyTip: row.daily_tip || null,
+    actDone: row.act_done || false, actSummary: row.act_summary || null,
     dayRating: row.day_rating || 0, dayNotes: row.day_review_notes || '',
     score: row.day_score, dailyNote: row.day_note, pointsAwarded: row.points_awarded || false,
     mainEmotion: row.main_emotion || null
@@ -448,7 +450,7 @@ const ONBOARDING_SLIDES = [
 
 let state = {
   screen:'login', authError:'', email:'',
-  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null },
+  plan:{ morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null, actDone:false, actSummary:null },
   cbt:{ step:0, showReflection:false, reflectionText:'', reflectionLoading:false,
     automaticThought:'', beliefBefore:50, emotion:'', emotionIntensity:50, evidenceFor:'', evidenceAgainst:'',
     helpsNow:null, harmsNow:null, thinkingErrors:[], newThoughtUser:'', beliefAfter:50, beliefOldAfter:50 },
@@ -1017,6 +1019,15 @@ function screenHome(){
     <div><div style="font-weight:800; font-size:16.5px;">${streak} ${streak===1?'يوم متتالٍ':'أيام متتالية'}</div><div class="muted" style="font-size:12px; margin-top:2px;">حافظ على استمراريتك، يومًا بعد يوم</div></div>
   </div>` : ''}
   ${heroCard()}
+  <div class="card" style="${state.plan.actDone?'opacity:.55;':'cursor:pointer;'} background:linear-gradient(135deg,#FDEDE9,#F3EFE4); border:1px solid #F3CFC5;" ${state.plan.actDone?'':`onclick="startActFlow('home')"`}>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="moment-icon" style="background:#fff; color:var(--danger);">🤲</div>
+      <div style="flex:1;">
+        <div style="font-weight:800; font-size:14.5px; color:var(--danger);">SOS — لو كنت صديقك</div>
+        <div class="muted" style="font-size:12px; margin-top:2px;">${state.plan.actDone? 'استخدمته اليوم، موعدنا غدًا 🌿' : 'تحتاج كلمة داعمة الآن؟ تمرين سريع لتقبّل نفسك'}</div>
+      </div>
+    </div>
+  </div>
   ${tasksReminderCard()}
   ${today ? `<div class="card" style="display:flex; align-items:center; gap:14px;">
     <div class="score-badge" style="--pct:${today.score};"><div class="score-badge-inner">${today.score}</div></div>
@@ -1284,22 +1295,36 @@ function screenLunchActivity(){
   <button class="btn" onclick="clearInterval(breathingTimer); patchPlan({lunchDone:true}); go('home')">تم</button>`;
 }
 function screenEveningIntro(){
+  const actDone = state.plan.actDone;
   return `
   ${topbar('نهاية اليوم', "go('home')")}
-  ${companionSpeech('سأرافقك الآن خطوة بخطوة، وسأعلّق على كل إجابة لمساعدتك على إعادة الصياغة.', 52)}
-  <div class="card" style="line-height:2; font-size:14.5px; margin-top:14px;">
-    ⏱ أقل من دقيقتين، في 5 خطوات قصيرة فقط:<br>
-    ١. الفكرة والشعور<br>٢. الأدلة معها وضدها<br>٣. هل ما زالت تخدمك؟<br>٤. إعادة الصياغة<br>٥. أذكار المساء وتنفس قبل النوم
+  ${companionSpeech('كيف تحب أن ننهي يومك الليلة؟ اختر ما يناسبك أكثر الآن.', 52)}
+  <div class="card" style="margin-top:14px; cursor:pointer;" onclick="startEveningFlow()">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="moment-icon" style="background:var(--sage-light); color:var(--sage);">🧠</div>
+      <div>
+        <div style="font-weight:700; font-size:14.5px;">إعادة صياغة الأفكار (تقييم الأفكار التلقائية)</div>
+        <div class="muted" style="font-size:12px; margin-top:2px;">⏱ أقل من دقيقتين، 5 خطوات — مناسب إذا كانت لديك فكرة مزعجة محددة</div>
+      </div>
+    </div>
   </div>
-  <div class="card" style="border:1.5px dashed var(--sage-light);">
+  <div class="card" style="margin-top:10px; ${actDone?'opacity:.55;':'cursor:pointer;'}" ${actDone?'':'onclick="startActFlow(\'evening_adhkar\')"'}>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="moment-icon" style="background:var(--amber-light); color:var(--amber);">🤲</div>
+      <div>
+        <div style="font-weight:700; font-size:14.5px;">لو كنت صديقك</div>
+        <div class="muted" style="font-size:12px; margin-top:2px;">${actDone? 'أنجزته اليوم بالفعل 🌿' : '⏱ حوالي دقيقتين — مناسب إذا كنت تحتاج تعاطفًا مع نفسك أكثر من تحليل فكرة'}</div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="border:1.5px dashed var(--sage-light); margin-top:10px;">
     <div style="font-weight:700; font-size:13.5px; margin-bottom:10px;">📝 مثال سريع لتتضح الفكرة</div>
     <div style="font-size:13px; line-height:2.1;">
       <b>الفكرة التلقائية:</b> "لن أنجح مهما حاولت"<br>
       <b>الشعور:</b> الحزن والأسى (65/100)<br>
       <b>بعد إعادة الصياغة:</b> "قد أواجه صعوبات، لكن هذا لا يعني أنني سأفشل دائمًا"
     </div>
-  </div>
-  <button class="btn" onclick="startEveningFlow()">فهمت، ابدأ</button>`;
+  </div>`;
 }
 const CBT_TOTAL_STEPS = 5;
 function cbtProgress(){
@@ -1595,6 +1620,174 @@ function reportSection(title, text, icon){
   return `<div class="card"><div class="report-section"><div class="report-icon">${icon}</div>
     <div><div class="report-title">${title}</div><div class="report-text">${text}</div></div></div></div>`;
 }
+function reportSection(title, text, icon){
+  if(!text || !text.trim()) return '';
+  return `<div class="card"><div class="report-section"><div class="report-icon">${icon}</div>
+    <div><div class="report-title">${title}</div><div class="report-text">${text}</div></div></div></div>`;
+}
+
+/* ============================================================
+   تمرين ACT: "لو كنت صديقك" — بديل/تكملة لتقييم الأفكار
+   ============================================================ */
+const ACT_TOTAL_STEPS = 3;
+async function startActFlow(returnScreen){
+  state.act = { step:0, showReflection:false, reflectionText:'', reflectionLoading:false, reflectionAiUsed:null,
+    worry:'', emotion:'', emotionIntensity:50, friendAdvice:'', selfTalk:null, anchorPhrase:null, encouragement:null,
+    returnScreen: returnScreen || 'home' };
+  go('act');
+}
+function actProgress(){
+  let segs=''; for(let i=0;i<ACT_TOTAL_STEPS;i++){ segs += `<div class="progress-seg ${i<=state.act.step?'active':''}"></div>`; }
+  return `<div class="progress-track">${segs}</div>`;
+}
+async function nextWithActReflection(promptContext, fallbackText){
+  state.act = {...state.act, showReflection:true, reflectionLoading:true, reflectionText:'', reflectionAiUsed:null};
+  render();
+  const result = await aiStepFeedback(promptContext, fallbackText);
+  state.act = {...state.act, reflectionText:result.text, reflectionLoading:false, reflectionAiUsed:result.aiUsed};
+  render();
+  if(state.autoSpeak) speakText(result.text);
+}
+function actReflectionView(){
+  const badge = state.act.reflectionAiUsed===true
+    ? `<div style="font-size:11px; color:var(--sage); font-weight:700; margin-bottom:6px;">✨ صياغة مباشرة من المساعد الذكي</div>`
+    : state.act.reflectionAiUsed===false
+      ? `<div style="font-size:11px; color:var(--danger); font-weight:700; margin-bottom:6px;">⚠️ تعذّر الاتصال بالذكاء الاصطناعي — نص افتراضي معروض</div>` : '';
+  const speakBtn = (!state.act.reflectionLoading && state.act.reflectionText) ?
+    `<button class="icon-btn" style="width:24px; height:24px; flex-shrink:0;" title="استمع" onclick="speakById('${registerSpeak(state.act.reflectionText)}')">${ic.speaker}</button>` : '';
+  return `${actProgress()}${badge}
+  <div class="bubble">
+    ${companionAvatar(36)}
+    <div style="flex:1;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+        <div style="font-weight:700; font-size:12.5px; opacity:.8;">${COMPANION_NAME}</div>
+        ${speakBtn}
+      </div>
+      <div>${state.act.reflectionLoading? '...يفكّر معك الآن' : '"'+state.act.reflectionText+'"'}</div>
+    </div>
+  </div>
+  <div style="height:30px;"></div>
+  <button class="btn" ${state.act.reflectionLoading?'disabled':''} onclick="actContinue()">متابعة</button>`;
+}
+async function actContinue(){
+  if(state.act.reflectionLoading) return;
+  stopSpeech();
+  if(state.act.step < ACT_TOTAL_STEPS-1){
+    state.act = {...state.act, showReflection:false, step: state.act.step+1};
+    render();
+  } else {
+    state.act = {...state.act, showReflection:false};
+    go('act_report');
+    runActReport();
+  }
+}
+function screenAct(){
+  if(state.act.showReflection) return `${topbar('لو كنت صديقك', "go('evening_intro')")}${actReflectionView()}`;
+  const s = state.act.step;
+  const ask = (text)=> `<div class="bubble" style="margin-bottom:16px;">${companionAvatar(30)}<div><div style="font-weight:700; font-size:12px; opacity:.8; margin-bottom:3px;">${COMPANION_NAME}</div><div>${text}</div></div></div>`;
+  let body='';
+  if(s===0){
+    body = `${ask('أخبرني، ما الذي يثقل عليك الآن؟ 💭')}
+    <textarea class="field" rows="4" id="actWorry" placeholder="اكتب ما يشغل بالك الآن..." oninput="state.act.worry=this.value">${state.act.worry}</textarea>
+    <button class="btn" style="margin-top:16px;" onclick="actStep0Next()">التالي</button>`;
+  } else if(s===1){
+    body = `${ask('وما الشعور الذي رافق هذا الأمر؟')}
+    <div class="chip-wrap">${EMOTIONS.map(e=>`<span class="chip ${state.act.emotion===e?'selected':''}" onclick="setAct({emotion:'${e}'})">${e}</span>`).join('')}</div>
+    <p style="margin-top:18px; font-size:13.5px;">وبأي شدة تشعر به؟</p>
+    <input type="range" min="0" max="100" step="10" value="${state.act.emotionIntensity}" oninput="setAct({emotionIntensity:+this.value})"/>
+    <div class="slider-value">${state.act.emotionIntensity} / 100</div>
+    <button class="btn" style="margin-top:18px;" onclick="actStep1Next()">التالي</button>`;
+  } else {
+    body = `${ask('تخيّل الآن أن أعزّ أصدقائك يمر بنفس هذا الموقف بالضبط، وجاء يشاركك همّه. ماذا كنت لتقول له لتُطمئنه؟')}
+    <textarea class="field" rows="4" id="actFriendAdvice" placeholder="اكتب ما كنت لتقوله لصديقك..." oninput="state.act.friendAdvice=this.value">${state.act.friendAdvice}</textarea>
+    <button class="btn" style="margin-top:16px;" onclick="actStep2Next()">التالي</button>`;
+  }
+  return `${topbar('لو كنت صديقك', "go('evening_intro')")}${actProgress()}${body}`;
+}
+function setAct(patch){ state.act = {...state.act, ...patch}; render(); }
+function actStep0Next(){
+  const val = (document.getElementById('actWorry').value||'').trim();
+  if(!val) return;
+  state.act.worry = val;
+  nextWithActReflection(
+    `شارك المستخدم أمرًا يثقل عليه: "${val}". اكتب تعليقًا قصيرًا (2-3 جمل) يتقبّل ما شاركه دون حكم، ويمهّد بلطف للخطوة التالية (تحديد الشعور المرتبط بذلك).`,
+    'شكرًا لمشاركتي هذا. الخطوة التالية ستساعدنا على فهم شعورك تجاهه بوضوح أكبر.'
+  );
+}
+function actStep1Next(){
+  if(!state.act.emotion) return;
+  nextWithActReflection(
+    `حدد المستخدم شعوره بأنه "${state.act.emotion}" بشدة ${state.act.emotionIntensity}/100 تجاه: "${state.act.worry}". اكتب تعليقًا قصيرًا (2-3 جمل) يتقبّل هذا الشعور بلطف، ويمهّد للخطوة القادمة وهي تخيّل نصيحة لصديق يمر بنفس الأمر.`,
+    'مشاعرك مفهومة تمامًا. الآن، لنجرّب أن ننظر للأمر من زاوية مختلفة قليلًا.'
+  );
+}
+function actStep2Next(){
+  const val = (document.getElementById('actFriendAdvice').value||'').trim();
+  if(!val) return;
+  state.act.friendAdvice = val;
+  actContinue();
+}
+const ACT_REPORT_SYSTEM_PROMPT = `أنت ${COMPANION_NAME}، مرافق داعم ضمن تطبيق "انصحني"، متخصص في مساعدة المستخدم على تقبّل نفسه بلطف (بأسلوب العلاج بالقبول والالتزام ACT).
+حوّل النصيحة التي كتبها المستخدم لصديقه المتخيَّل إلى حديث ذاتي بصيغة المتكلم، بنفس الكلمات والروح تقريبًا، دون تغيير جوهر المعنى.
+ثم استخرج من ذلك عبارة قصيرة جدًا (5 إلى 9 كلمات) تصلح كـ"عبارة ترسيخ" يردّدها المستخدم وقت الحاجة، وكأنها ملخّص لحكمته الخاصة.
+ثم اكتب كلمة تشجيع دافئة (3-4 جمل) تربط ذلك تحديدًا بما شاركه عن قلقه وشعوره، دون عموميات.
+إذا لاحظت مؤشرات على ضيق شديد ومستمر أو أفكار إيذاء النفس، أضف "professional_referral": true مع سبب واضح ومحترم.
+أجب حصرًا بصيغة JSON دون أي نص إضافي: {"self_talk":"...", "anchor_phrase":"...", "encouragement":"...", "professional_referral":false, "referral_reason":""}`;
+async function runActReport(){
+  setState({actLoading:true, actError:''});
+  const a = state.act;
+  const userMsg = `الأمر الذي يثقل عليه: ${a.worry}
+الشعور: ${a.emotion} (شدته: ${a.emotionIntensity}/100)
+ما كتبه كنصيحة لصديق متخيَّل يمر بنفس الأمر: ${a.friendAdvice}`;
+  try{
+    const res = await fetch("/.netlify/functions/ai-proxy", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ max_tokens:500, system:ACT_REPORT_SYSTEM_PROMPT, messages:[{role:"user", content:userMsg}] })
+    });
+    const data = await res.json();
+    const raw = (data.content||[]).map(b=>b.text||'').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    state.act.selfTalk = parsed.self_talk; state.act.anchorPhrase = parsed.anchor_phrase; state.act.encouragement = parsed.encouragement;
+    state.act.professionalReferral = parsed.professional_referral||false; state.act.referralReason = parsed.referral_reason||'';
+    setState({actLoading:false});
+    if(state.autoSpeak) speakText(parsed.self_talk);
+    await patchPlan({ actDone:true, actSummary:{ worry:a.worry, emotion:a.emotion, anchorPhrase:parsed.anchor_phrase } });
+  }catch(err){
+    console.error(err);
+    setState({actLoading:false, actError:'تعذّر الاتصال بالمساعد الذكي حاليًا. حاول لاحقًا.'});
+  }
+}
+function screenActReport(){
+  const back = state.act.returnScreen || 'home';
+  if(state.actLoading){
+    return `${topbar('لو كنت صديقك', null)}
+    <div style="text-align:center; padding-top:60px;"><div class="spinner"></div><p class="muted" style="margin-top:16px;">${COMPANION_NAME} يُعِدّ كلماتك الآن...</p></div>`;
+  }
+  if(state.actError){
+    return `${topbar('لو كنت صديقك', null)}
+    <div style="text-align:center; padding-top:40px;">
+      <div style="color:var(--ink-soft); margin-bottom:10px;">${ic.alert}</div>
+      <p style="font-size:14px;">${state.actError}</p>
+      <button class="btn" style="margin-top:16px;" onclick="runActReport()">إعادة المحاولة</button></div>`;
+  }
+  const a = state.act;
+  return `${topbar('لو كنت صديقك', null)}
+  ${a.professionalReferral? `<div class="referral-box"><span>${ic.alert}</span><span>${a.referralReason || 'يُنصح بالتحدث مع مختص بخصوص ما تمر به.'}</span></div>`:''}
+  <p class="muted" style="font-size:13px; margin-bottom:8px;">الآن، بنفس الكلمات بالضبط... قلها لنفسك:</p>
+  <div class="card" style="text-align:center;">
+    <div style="display:flex; justify-content:center; margin-bottom:10px;">
+      <button class="icon-btn" title="استمع" onclick="speakById('${registerSpeak(a.selfTalk||'')}')">${ic.speaker}</button>
+    </div>
+    <p style="font-family:'Amiri'; font-size:18px; line-height:1.9;">"${a.selfTalk||''}"</p>
+  </div>
+  <p class="muted" style="font-size:13px; margin:16px 0 8px;">عبارتك الخاصة — احتفظ بها وردّدها كلما احتجتها:</p>
+  <div class="card" style="text-align:center; background:linear-gradient(160deg,#FFF6E6,#F3EFE4); border:1px solid #F0DBA6;">
+    <p style="font-weight:800; font-size:15.5px; color:var(--ink);">${a.anchorPhrase||''}</p>
+  </div>
+  ${companionSpeech(a.encouragement||'', 36)}
+  <button class="btn" style="margin-top:16px;" onclick="go('${back}')">${back==='evening_adhkar' ? 'متابعة إلى أذكار المساء' : 'العودة إلى الرئيسية'}</button>`;
+}
+
 function screenEveningAdhkar(){
   return `${topbar('أذكار المساء', null)}
   <div class="card">
@@ -1689,7 +1882,12 @@ function buildHistoryContext(){
   return recent.map(h=>`${h.date}: نقطة ${h.score}/100${h.emotion? '، الشعور الأساسي: '+h.emotion : ''}`).join('\n');
 }
 async function generateDailyNote(plan, score){
-  const summary = `أنجز المستخدم اليوم: أذكار الصباح: ${plan.morningDone?'نعم':'لا'}. المهام المنجزة: ${plan.tasks.filter(t=>t.done).length}/${plan.tasks.length}. نشاط الظهيرة: ${plan.lunchDone?'نعم':'لا'}. تمرين إعادة صياغة الأفكار: مكتمل${plan.mainEmotion? ' (الشعور الأساسي اليوم: '+plan.mainEmotion+')':''}. أذكار المساء: ${plan.eveningAdhkarDone?'نعم':'لا'}. تمرين التنفس: مكتمل. تقييمه الذاتي ليومه: ${plan.dayRating||'غير محدد'}/5. النقطة الإجمالية: ${score}/100.
+  const eveningExercise = state.aiReport
+    ? `تمرين إعادة صياغة الأفكار: مكتمل${plan.mainEmotion? ' (الشعور الأساسي اليوم: '+plan.mainEmotion+')':''}.`
+    : plan.actDone
+      ? `تمرين "لو كنت صديقك" (ACT): مكتمل${plan.actSummary? ' — توصّل إلى عبارة الترسيخ: "'+plan.actSummary.anchorPhrase+'"' : ''}.`
+      : 'لم يُنجز أي تمرين مسائي بعد.';
+  const summary = `أنجز المستخدم اليوم: أذكار الصباح: ${plan.morningDone?'نعم':'لا'}. المهام المنجزة: ${plan.tasks.filter(t=>t.done).length}/${plan.tasks.length}. نشاط الظهيرة: ${plan.lunchDone?'نعم':'لا'}. ${eveningExercise} أذكار المساء: ${plan.eveningAdhkarDone?'نعم':'لا'}. تمرين التنفس: مكتمل. تقييمه الذاتي ليومه: ${plan.dayRating||'غير محدد'}/5. النقطة الإجمالية: ${score}/100.
 سجل الأيام السابقة (الأحدث أولًا):
 ${buildHistoryContext()}`;
   try{
@@ -1711,7 +1909,7 @@ function fallbackDailyNote(score){
 async function onDayFinished(breathingCompleted){
   if(breathingCompleted === undefined) breathingCompleted = true;
   await patchPlan({breathingDone:true, breathingSkipped: !breathingCompleted});
-  const cbtCompleted = !!state.aiReport;
+  const cbtCompleted = !!state.aiReport || !!state.plan.actDone;
   const score = computeDayScore(state.plan, cbtCompleted, breathingCompleted);
   await patchPlan({score});
   render(); // affiche l'écran final avec spinner pour la note IA
@@ -1863,13 +2061,13 @@ function planKey(email){ return `ansahni:plan:${email}:${todayStr()}`; }
 async function loadTodayPlan(email){
   if(!DEMO_MODE && supabase && currentUserId){
     const row = await dbLoadOrCreatePlan(currentUserId, todayStr());
-    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
+    state.plan = row ? mapDbPlanToState(row) : { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null, actDone:false, actSummary:null };
     state.scoreHistory = await dbLoadScoreHistory(currentUserId);
     state.loadedPlanDate = todayStr();
     return;
   }
   const saved = await getJson(planKey(email), null);
-  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
+  state.plan = saved || { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null, actDone:false, actSummary:null };
   state.scoreHistory = await getJson(`ansahni:scores:${email}`, []);
   state.points = await getJson(`ansahni:points:${email}`, 0);
   state.autoSpeak = await getJson(`ansahni:autospeak:${email}`, true);
@@ -1976,7 +2174,7 @@ async function doLogout(){
     currentUserId = null;
   }
   state.email=''; state.userName='';
-  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null };
+  state.plan = { morningDone:false, tasks:[], lunchDone:false, lunchType:null, eveningAdhkarDone:false, breathingDone:false, dayRating:0, dayNotes:'', score:null, dailyNote:null, pointsAwarded:false, mainEmotion:null, breathingSkipped:false, dailyTip:null, actDone:false, actSummary:null };
   stopSpeech(); setState({screen:'login'});
 }
 
@@ -2003,6 +2201,8 @@ function render(){
     case 'evening_intro': html = screenEveningIntro(); break;
     case 'cbt': html = screenCbt(); break;
     case 'cbt_report': html = screenCbtReport(); break;
+    case 'act': html = screenAct(); break;
+    case 'act_report': html = screenActReport(); break;
     case 'evening_adhkar': html = screenEveningAdhkar(); break;
     case 'day_eval': html = screenDayEval(); break;
     case 'breathing': html = screenBreathing(); break;
