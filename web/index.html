@@ -974,6 +974,18 @@ function countrySelect(){
     ${COUNTRY_CODES.map(c=>`<option value="${c.code}" ${c.code==='+216'?'selected':''}>${c.code} ${c.name}</option>`).join('')}
   </select>`;
 }
+function phoneToSyntheticEmail(phone){ return phone.replace('+','') + '@phone.ansahni.app'; }
+async function doLogin(){
+  const method = state.authMethod || 'phone';
+  const identifier = method==='phone' ? buildFullPhone() : document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!identifier || !password){ setState({authError: method==='phone' ? 'يرجى إدخال رقم الهاتف وكلمة المرور' : 'يرجى إدخال البريد الإلكتروني وكلمة المرور'}); return; }
+  if(!supabase){ await previewAuthEnter(identifier, ''); return; }
+  const loginEmail = method==='phone' ? phoneToSyntheticEmail(identifier) : identifier;
+  const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
+  if(error){ setState({authError: method==='phone' ? 'رقم الهاتف أو كلمة المرور غير صحيحة' : 'البريد الإلكتروني أو كلمة المرور غير صحيحة'}); return; }
+  await afterAuthSuccess(data.user);
+}
 function buildFullPhone(){
   const code = document.getElementById('countryCode').value;
   const num = document.getElementById('phoneNumber').value.trim().replace(/^0+/,'').replace(/\D/g,'');
@@ -2173,17 +2185,6 @@ async function previewAuthEnter(email, name){
   const onboarded = await getJson(`ansahni:onboarded:${email}`, false);
   stopSpeech(); setState({screen: onboarded ? 'home' : 'onboarding', onboardingIndex:0, authError:'', previewRealAuth:false});
 }
-async function doLogin(){
-  const method = state.authMethod || 'phone';
-  const identifier = method==='phone' ? buildFullPhone() : document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  if(!identifier || !password){ setState({authError: method==='phone' ? 'يرجى إدخال رقم الهاتف وكلمة المرور' : 'يرجى إدخال البريد الإلكتروني وكلمة المرور'}); return; }
-  if(!supabase){ await previewAuthEnter(identifier, ''); return; }
-  const credentials = method==='phone' ? { phone: identifier, password } : { email: identifier, password };
-  const { data, error } = await supabase.auth.signInWithPassword(credentials);
-  if(error){ setState({authError: method==='phone' ? 'رقم الهاتف أو كلمة المرور غير صحيحة' : 'البريد الإلكتروني أو كلمة المرور غير صحيحة'}); return; }
-  await afterAuthSuccess(data.user);
-}
 async function doSignup(){
   const method = state.authMethod || 'phone';
   const name = document.getElementById('fullname').value.trim();
@@ -2191,23 +2192,26 @@ async function doSignup(){
   const password = document.getElementById('password').value;
   if(!identifier || password.length<6){ setState({authError: (method==='phone' && !identifier) ? 'يرجى إدخال رقم هاتف صحيح' : 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل'}); return; }
   if(!supabase){ await previewAuthEnter(identifier, name); return; }
-  const payload = method==='phone'
-    ? { phone: identifier, password, options:{ data:{ full_name:name } } }
-    : { email: identifier, password, options:{ data:{ full_name:name } } };
+  const signupEmail = method==='phone' ? phoneToSyntheticEmail(identifier) : identifier;
+  const payload = { email: signupEmail, password, options:{ data:{ full_name:name, phone: method==='phone' ? identifier : null } } };
   const { data, error } = await supabase.auth.signUp(payload);
-  if(error){ setState({authError:'تعذّر إنشاء الحساب: '+error.message}); return; }
-  if(!data.session){ setState({authError:'', screen:'login'}); alert(method==='phone' ? 'تم إنشاء الحساب. إذا طُلب منك تأكيد الرقم، تحقق من رسائل SMS.' : 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني واضغط رابط التأكيد قبل تسجيل الدخول.'); render(); return; }
+  if(error){
+    const msg = /registered/i.test(error.message) ? (method==='phone' ? 'هذا الرقم مسجّل بالفعل بحساب.' : 'هذا البريد الإلكتروني مسجّل بالفعل بحساب.') : 'تعذّر إنشاء الحساب: '+error.message;
+    setState({authError:msg}); return;
+  }
+  if(!data.session){ setState({authError:'', screen:'login'}); alert(method==='phone' ? 'تم إنشاء الحساب، يمكنك تسجيل الدخول الآن.' : 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني واضغط رابط التأكيد قبل تسجيل الدخول.'); render(); return; }
   await afterAuthSuccess(data.user);
 }
 async function afterAuthSuccess(user){
   currentUserId = user.id;
-  state.email = user.email || user.phone || '';
+  const realPhone = user.user_metadata && user.user_metadata.phone;
+  state.email = realPhone || user.email || '';
   let profile = await dbLoadProfile(user.id);
   if(!profile){ // trigger éventuellement pas encore exécuté
     await new Promise(r=>setTimeout(r,600));
     profile = await dbLoadProfile(user.id);
   }
-  const fallbackName = (user.email && user.email.split('@')[0]) || user.phone || 'صديقي';
+  const fallbackName = realPhone || (user.email && user.email.split('@')[0]) || 'صديقي';
   state.userName = (profile && profile.full_name) || (user.user_metadata && user.user_metadata.full_name) || fallbackName;
   state.points = (profile && profile.points) || 0;
   state.autoSpeak = profile ? profile.auto_speak : true;
