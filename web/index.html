@@ -1034,9 +1034,10 @@ function screenLogin(){
     <input class="field" id="password" type="password" placeholder="كلمة المرور" />
     ${state.authError? `<div class="error-text">${state.authError}</div>`:''}
     <button class="btn" onclick="doLogin()">تسجيل الدخول</button>
-    <button class="link-btn" onclick="go('signup')">ليس لديك حساب؟ أنشئ حسابًا جديدًا</button>
-    <button class="link-btn" onclick="setAuthMethod('${method==='phone'?'email':'phone'}')">${method==='phone' ? 'تسجيل الدخول بالبريد الإلكتروني بدلًا من ذلك' : 'تسجيل الدخول برقم الهاتف بدلًا من ذلك'}</button>
-    ${DEMO_MODE ? `<button class="link-btn" onclick="setState({previewRealAuth:false})">← رجوع للنسخة التجريبية</button>`:''}
+    <button class="link-btn" onclick="go('signup')" style="font-weight:700;">ليس لديك حساب؟ أنشئ حسابًا جديدًا</button>
+    <div style="height:1px; background:var(--sand-deep); margin:6px 0;"></div>
+    <button class="link-btn" onclick="setAuthMethod('${method==='phone'?'email':'phone'}')" style="font-weight:400; font-size:12.5px; color:var(--ink-soft);">${method==='phone' ? '📧 تسجيل الدخول بالبريد الإلكتروني بدلًا من ذلك' : '📱 تسجيل الدخول برقم الهاتف بدلًا من ذلك'}</button>
+    ${DEMO_MODE ? `<button class="link-btn" onclick="setState({previewRealAuth:false})" style="font-weight:400; font-size:12.5px; color:var(--ink-soft);">← رجوع للنسخة التجريبية</button>`:''}
   </div>
   ${footer}`;
 }
