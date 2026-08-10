@@ -15,8 +15,13 @@ exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'متغيرات البيئة الناقصة على الخادم (تحقق من Netlify env vars).' }) };
+  const missing = [];
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!VAPID_PUBLIC_KEY) missing.push('VAPID_PUBLIC_KEY');
+  if (!VAPID_PRIVATE_KEY) missing.push('VAPID_PRIVATE_KEY');
+  if (missing.length) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'متغيرات ناقصة على الخادم: ' + missing.join('، ') }) };
   }
 
   const authHeader = event.headers.authorization || event.headers.Authorization;

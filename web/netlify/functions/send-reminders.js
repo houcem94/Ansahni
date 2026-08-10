@@ -22,8 +22,13 @@ const SLOTS = [
 ];
 
 const handler = async () => {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.error('متغيرات البيئة الناقصة لإرسال التذكيرات (تحقق من Netlify env vars)');
+  const missing = [];
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!VAPID_PUBLIC_KEY) missing.push('VAPID_PUBLIC_KEY');
+  if (!VAPID_PRIVATE_KEY) missing.push('VAPID_PRIVATE_KEY');
+  if (missing.length) {
+    console.error('متغيرات البيئة الناقصة لإرسال التذكيرات: ' + missing.join('، ') + ' (تحقق من Netlify env vars)');
     return { statusCode: 200 };
   }
 
