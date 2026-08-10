@@ -1131,8 +1131,6 @@ function screenHome(){
     <div><div style="font-weight:800; font-size:16.5px;">${streak} ${streak===1?'يوم متتالٍ':'أيام متتالية'}</div><div class="muted" style="font-size:12px; margin-top:2px;">حافظ على استمراريتك، يومًا بعد يوم</div></div>
   </div>` : ''}
   ${heroCard()}
-  <div style="font-size:10.5px; color:#999; text-align:center; margin-bottom:8px; direction:ltr;">DEBUG — DEMO_MODE:${DEMO_MODE} | supabase:${!!supabase} | notificationsEnabled:${state.notificationsEnabled}</div>
-  ${(!DEMO_MODE && supabase && state.notificationsEnabled) ? `<button class="link-btn" style="display:block; text-align:center; width:100%; margin:-4px 0 14px; font-size:12.5px;" onclick="testPushNotification()">🔔 اختبار الإشعار الآن</button>` : ''}
   <div class="card" style="${state.plan.actDone?'opacity:.55;':'cursor:pointer;'} background:linear-gradient(135deg,#FDEDE9,#F3EFE4); border:1px solid #F3CFC5;" ${state.plan.actDone?'':`onclick="startActFlow('home')"`}>
     <div style="display:flex; align-items:center; gap:12px;">
       <div class="moment-icon" style="background:#fff; color:var(--danger);">🤲</div>
