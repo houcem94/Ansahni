@@ -561,6 +561,54 @@ function toggleAutoSpeak(){
    ملاحظة صادقة: هذا تذكير محلي يعمل عندما يكون التطبيق مفتوحًا أو استُخدم
    مؤخرًا، وليس نظام "Web Push" حقيقيًا يعمل حتى لو أُغلق التطبيق تمامًا. */
 const REMINDER_TIMES = { morning:{h:8,m:0}, midday:{h:13,m:0}, evening:{h:20,m:0} };
+const VAPID_PUBLIC_KEY = 'BA8wzTMmvKHXEmDAzQYAK_UmLwLmh5aQ50UtRKBBcnN7wmAqqBRnLJGAZGAexFr6KTyR-qNUKeLWb3MvOXCD_2g';
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+async function subscribeToPush(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    const json = sub.toJSON();
+    await supabase.from('push_subscriptions').upsert({
+      user_id: currentUserId, endpoint: json.endpoint, keys: json.keys
+    }, { onConflict:'endpoint' });
+    return true;
+  }catch(e){ console.error('push subscribe error:', e); return false; }
+}
+async function unsubscribeFromPush(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      await sub.unsubscribe();
+    }
+  }catch(e){ console.error('push unsubscribe error:', e); }
+}
+async function testPushNotification(){
+  if(!supabase || !currentUserId){ alert('يجب تسجيل الدخول أولًا.'); return; }
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData && sessionData.session && sessionData.session.access_token;
+  if(!token){ alert('انتهت الجلسة، سجّل الدخول من جديد.'); return; }
+  try{
+    const res = await fetch('/.netlify/functions/test-push', {
+      method:'POST', headers:{ 'Authorization': 'Bearer '+token }
+    });
+    const data = await res.json();
+    if(!res.ok){ alert(data.error || 'تعذّر إرسال إشعار الاختبار.'); return; }
+    alert('تم إرسال إشعار الاختبار! إن لم يصلك خلال ثوانٍ قليلة، تحقق من إعدادات الإشعارات في هاتفك أو من متصفح Chrome.');
+  }catch(e){ console.error(e); alert('تعذّر الاتصال بالخادم.'); }
+}
 async function toggleNotifications(){
   if(!('Notification' in window)){
     alert('الإشعارات غير مدعومة في هذا المتصفح.');
@@ -572,6 +620,12 @@ async function toggleNotifications(){
       alert('يجب السماح بالإشعارات من إعدادات المتصفح ليعمل هذا الخيار.');
       return;
     }
+    if(!DEMO_MODE && supabase && currentUserId){
+      const ok = await subscribeToPush();
+      if(!ok){ alert('تعذّر تفعيل الإشعارات الفورية الآن، حاول لاحقًا.'); return; }
+    }
+  } else {
+    if(!DEMO_MODE && supabase && currentUserId){ await unsubscribeFromPush(); }
   }
   state.notificationsEnabled = !state.notificationsEnabled;
   if(!DEMO_MODE && supabase && currentUserId){ dbUpdateProfile(currentUserId, {notifications_enabled: state.notificationsEnabled}); }
@@ -1077,6 +1131,7 @@ function screenHome(){
     <div><div style="font-weight:800; font-size:16.5px;">${streak} ${streak===1?'يوم متتالٍ':'أيام متتالية'}</div><div class="muted" style="font-size:12px; margin-top:2px;">حافظ على استمراريتك، يومًا بعد يوم</div></div>
   </div>` : ''}
   ${heroCard()}
+  ${(!DEMO_MODE && supabase && state.notificationsEnabled) ? `<button class="link-btn" style="display:block; text-align:center; width:100%; margin:-4px 0 14px; font-size:12.5px;" onclick="testPushNotification()">🔔 اختبار الإشعار الآن</button>` : ''}
   <div class="card" style="${state.plan.actDone?'opacity:.55;':'cursor:pointer;'} background:linear-gradient(135deg,#FDEDE9,#F3EFE4); border:1px solid #F3CFC5;" ${state.plan.actDone?'':`onclick="startActFlow('home')"`}>
     <div style="display:flex; align-items:center; gap:12px;">
       <div class="moment-icon" style="background:#fff; color:var(--danger);">🤲</div>
